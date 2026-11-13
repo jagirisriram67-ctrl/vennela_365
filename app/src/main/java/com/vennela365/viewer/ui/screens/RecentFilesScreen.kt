@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -68,6 +69,7 @@ import com.vennela365.viewer.ui.components.SectionHeader
 import com.vennela365.viewer.ui.components.VennelaEmptyState
 import com.vennela365.viewer.ui.components.VennelaMetadataRow
 import com.vennela365.viewer.ui.components.pressScale
+import com.vennela365.viewer.ui.components.rememberLazyScrollSignal
 import com.vennela365.viewer.ui.components.staggeredEntrance
 import com.vennela365.viewer.viewmodel.MainViewModel
 import com.vennela365.viewer.viewmodel.Screen
@@ -138,6 +140,9 @@ fun RecentFilesScreen(viewModel: MainViewModel) {
     var infoFile by remember { mutableStateOf<FileItem?>(null) }
     var collapsed by remember { mutableStateOf(emptySet<RecentBucket>()) }
 
+    // The header slides away while the list scrolls down.
+    val recentListState = rememberLazyListState()
+
     val favoriteNames = remember(favoriteFiles) { favoriteFiles.map { it.name }.toSet() }
 
     val filteredFiles = remember(selectedFilter, recentFiles, sortMode) {
@@ -172,6 +177,7 @@ fun RecentFilesScreen(viewModel: MainViewModel) {
     }
 
     LiquidPage(
+        scrollState = rememberLazyScrollSignal(recentListState),
         dock = {
             FloatingDockNav(
                 activeTab = "files",
@@ -188,6 +194,7 @@ fun RecentFilesScreen(viewModel: MainViewModel) {
         }
     ) { pagePadding ->
         LazyColumn(
+            state = recentListState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 top = VennelaTokens.spaceXs,

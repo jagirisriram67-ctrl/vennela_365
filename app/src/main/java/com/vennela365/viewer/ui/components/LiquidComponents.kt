@@ -325,8 +325,8 @@ fun SectionHeader(
         modifier = modifier
             .fillMaxWidth()
             .padding(
-                top = VennelaTokens.spaceXl,
-                bottom = VennelaTokens.spaceMd,
+                top = VennelaTokens.spaceLg,
+                bottom = VennelaTokens.spaceSm,
                 start = VennelaTokens.spaceXs,
                 end = VennelaTokens.spaceXs
             ),
@@ -337,8 +337,8 @@ fun SectionHeader(
             // Neon accent bar — the section's signature.
             Box(
                 modifier = Modifier
-                    .width(4.dp)
-                    .height(20.dp)
+                    .width(3.dp)
+                    .height(16.dp)
                     .clip(RoundedCornerShape(VennelaTokens.radiusPill))
                     .background(
                         Brush.verticalGradient(
@@ -350,7 +350,7 @@ fun SectionHeader(
             Text(
                 text = title,
                 color = palette.textPrimary,
-                fontSize = VennelaTokens.titleLarge,
+                fontSize = VennelaTokens.titleMedium,
                 fontWeight = FontWeight.Bold
             )
         }
@@ -364,12 +364,12 @@ fun SectionHeader(
                     .background(accent.primary.copy(alpha = 0.14f))
                     .border(1.dp, accent.secondary.copy(alpha = 0.28f), RoundedCornerShape(VennelaTokens.radiusPill))
                     .pressScale(pressedScale = 0.94f, onClick = onAction)
-                    .padding(horizontal = VennelaTokens.spaceSm + VennelaTokens.spaceXxs, vertical = VennelaTokens.spaceXs)
+                    .padding(horizontal = VennelaTokens.spaceSm, vertical = VennelaTokens.spaceXs)
             ) {
                 Text(
                     text = actionLabel,
                     color = accent.secondary,
-                    fontSize = 14.sp,
+                    fontSize = VennelaTokens.bodySmall,
                     fontWeight = FontWeight.SemiBold
                 )
                 Icon(

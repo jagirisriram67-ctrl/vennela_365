@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -69,6 +70,7 @@ import com.vennela365.viewer.ui.components.LiquidPage
 import com.vennela365.viewer.ui.components.VennelaEmptyState
 import com.vennela365.viewer.ui.components.getCategoryIcon
 import com.vennela365.viewer.ui.components.pressScale
+import com.vennela365.viewer.ui.components.rememberLazyScrollSignal
 import com.vennela365.viewer.ui.components.staggeredEntrance
 import com.vennela365.viewer.viewmodel.MainViewModel
 import com.vennela365.viewer.viewmodel.Screen
@@ -134,7 +136,11 @@ fun FavoritesScreen(viewModel: MainViewModel) {
         else sortedFiles.filter { it.formatInfo.category == selectedFilter }
     }
 
+    // The header slides away while the list scrolls down.
+    val favoritesListState = rememberLazyListState()
+
     LiquidPage(
+        scrollState = rememberLazyScrollSignal(favoritesListState),
         dock = {
             FloatingDockNav(
                 activeTab = "favorites",
@@ -151,6 +157,7 @@ fun FavoritesScreen(viewModel: MainViewModel) {
         }
     ) { pagePadding ->
         LazyColumn(
+            state = favoritesListState,
             modifier = Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(
                 top = VennelaTokens.spaceSm,

@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -86,6 +87,7 @@ import com.vennela365.viewer.ui.components.LiquidChip
 import com.vennela365.viewer.ui.components.LiquidPage
 import com.vennela365.viewer.ui.components.SectionHeader
 import com.vennela365.viewer.ui.components.pressScale
+import com.vennela365.viewer.ui.components.rememberLazyScrollSignal
 import com.vennela365.viewer.ui.components.staggeredEntrance
 import com.vennela365.viewer.viewmodel.MainViewModel
 import com.vennela365.viewer.viewmodel.Screen
@@ -114,11 +116,15 @@ fun SettingsScreen(
     var cacheBytes by remember { mutableStateOf(cacheSizeBytes(context)) }
     var cacheCleared by remember { mutableStateOf(false) }
 
+    // The title bar slides away while the settings scroll down.
+    val settingsListState = rememberLazyListState()
+
     LiquidPage(
         modifier = modifier,
         title = "Settings",
         subtitle = "Customize your experience",
         onBack = { viewModel.navigateBack() },
+        scrollState = rememberLazyScrollSignal(settingsListState),
         topBarActions = {
             ThemeModeCycleButton(
                 mode = themeMode,
@@ -141,6 +147,7 @@ fun SettingsScreen(
         }
     ) { pagePadding ->
         LazyColumn(
+            state = settingsListState,
             modifier = Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(
                 start = VennelaTokens.gutter,

@@ -90,6 +90,7 @@ import com.vennela365.viewer.ui.components.VennelaErrorState
 import com.vennela365.viewer.ui.components.VennelaLoadingState
 import com.vennela365.viewer.ui.components.VennelaMetadataRow
 import com.vennela365.viewer.ui.components.pressScale
+import com.vennela365.viewer.ui.components.rememberLazyGridScrollSignal
 import com.vennela365.viewer.ui.components.staggeredEntrance
 import com.vennela365.viewer.viewmodel.BrowseCrumb
 import com.vennela365.viewer.viewmodel.MainViewModel
@@ -268,7 +269,7 @@ fun FileExplorerScreen(viewModel: MainViewModel) {
             else -> "Recently opened files"
         },
         onBack = { if (!viewModel.browseBack()) viewModel.navigateBack() },
-        scrollState = explorerGridState,
+        scrollState = rememberLazyGridScrollSignal(explorerGridState),
         dock = {
             Column(
                 modifier = Modifier.fillMaxWidth(),

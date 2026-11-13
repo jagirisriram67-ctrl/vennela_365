@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -71,6 +72,7 @@ import com.vennela365.viewer.ui.components.VennelaSearchField
 import com.vennela365.viewer.ui.components.getCategoryColor
 import com.vennela365.viewer.ui.components.getCategoryIcon
 import com.vennela365.viewer.ui.components.pressScale
+import com.vennela365.viewer.ui.components.rememberLazyGridScrollSignal
 import com.vennela365.viewer.ui.components.staggeredEntrance
 import com.vennela365.viewer.viewmodel.MainViewModel
 import com.vennela365.viewer.viewmodel.Screen
@@ -113,6 +115,9 @@ fun CategoriesScreen(viewModel: MainViewModel) {
     val cleanedQuery = query.trim()
     val searchActive = cleanedQuery.isNotEmpty() && activeCategory == null
 
+    // The title bar slides away while the catalogue scrolls down.
+    val categoriesGridState = rememberLazyGridState()
+
     val matchingFormats = remember(cleanedQuery, searchActive) {
         if (!searchActive) emptyList() else FormatRegistry.search(cleanedQuery).take(64)
     }
@@ -132,6 +137,7 @@ fun CategoriesScreen(viewModel: MainViewModel) {
             "Explore supported formats (${FormatRegistry.totalCount} registered)"
         },
         onBack = { viewModel.navigateBack() },
+        scrollState = rememberLazyGridScrollSignal(categoriesGridState),
         dock = {
             FloatingDockNav(
                 activeTab = "files",
@@ -156,6 +162,7 @@ fun CategoriesScreen(viewModel: MainViewModel) {
     ) { pagePadding ->
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 150.dp),
+            state = categoriesGridState,
             modifier = Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(
                 start = VennelaTokens.gutter,

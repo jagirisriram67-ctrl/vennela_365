@@ -81,6 +81,7 @@ import com.vennela365.viewer.ui.components.LiquidChip
 import com.vennela365.viewer.ui.components.LiquidPage
 import com.vennela365.viewer.ui.components.SectionHeader
 import com.vennela365.viewer.ui.components.pressScale
+import com.vennela365.viewer.ui.components.rememberLazyGridScrollSignal
 import com.vennela365.viewer.ui.components.staggeredEntrance
 import com.vennela365.viewer.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
@@ -138,6 +139,7 @@ fun ThemeSelectionScreen(
         title = "Theme Selection",
         subtitle = "Personalize Vennela 365 with beautiful themes",
         onBack = { viewModel.navigateBack() },
+        scrollState = rememberLazyGridScrollSignal(gridState),
         topBarActions = {
             ThemeModeCycleButton(
                 mode = themeMode,

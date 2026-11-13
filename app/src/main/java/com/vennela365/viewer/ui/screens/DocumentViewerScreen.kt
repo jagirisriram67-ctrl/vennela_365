@@ -1196,25 +1196,32 @@ private fun CollapsibleDocToolbar(
             .fillMaxWidth()
             .padding(horizontal = VennelaTokens.gutter, vertical = VennelaTokens.spaceXs)
             .height(barHeight)
-            .liquidGlass(spec, RoundedCornerShape(VennelaTokens.radiusCardLarge))
+            .liquidGlass(spec, RoundedCornerShape(VennelaTokens.radiusPill))
     ) {
         Row(
-            Modifier.weight(1f).padding(horizontal = VennelaTokens.spaceSm),
+            Modifier.weight(1f).padding(horizontal = VennelaTokens.spaceXs),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                Modifier.size(VennelaTokens.badgeSm)
+                Modifier.size(VennelaTokens.controlSm)
                     .clip(CircleShape)
-                    .background(accent.primary.copy(alpha = 0.26f))
-                    .border(1.dp, accent.secondary.copy(alpha = 0.34f), CircleShape)
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                accent.primary.copy(alpha = 0.90f),
+                                accent.secondary.copy(alpha = 0.70f)
+                            )
+                        )
+                    )
+                    .border(1.dp, Color.White.copy(alpha = 0.30f), CircleShape)
                     .pressScale(pressedScale = 0.90f, onClick = onBack),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
-                    tint = palette.textPrimary,
-                    modifier = Modifier.size(VennelaTokens.iconMd)
+                    tint = Color.White,
+                    modifier = Modifier.size(VennelaTokens.viewerIcon)
                 )
             }
             AnimatedVisibility(
@@ -1223,9 +1230,9 @@ private fun CollapsibleDocToolbar(
                 exit = fadeOut(LiquidMotion.exit()) + shrinkHorizontally(LiquidMotion.exit())
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Spacer(Modifier.width(VennelaTokens.spaceSm))
+                    Spacer(Modifier.width(VennelaTokens.spaceXs))
                     Box(
-                        Modifier.size(VennelaTokens.badgeSm)
+                        Modifier.size(VennelaTokens.controlSm)
                             .clip(RoundedCornerShape(VennelaTokens.radiusChip))
                             .background(
                                 Brush.linearGradient(
@@ -1242,8 +1249,8 @@ private fun CollapsibleDocToolbar(
                         Icon(
                             Icons.AutoMirrored.Filled.MenuBook,
                             contentDescription = null,
-                            tint = palette.textPrimary,
-                            modifier = Modifier.size(VennelaTokens.iconMd)
+                            tint = Color.White,
+                            modifier = Modifier.size(VennelaTokens.iconSm)
                         )
                     }
                 }
@@ -1253,7 +1260,7 @@ private fun CollapsibleDocToolbar(
                 Text(
                     text = fileName,
                     color = palette.textPrimary,
-                    fontSize = lerp(17.sp, 14.sp, collapse),
+                    fontSize = lerp(VennelaTokens.titleSmall, VennelaTokens.bodySmall, collapse),
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -1265,8 +1272,8 @@ private fun CollapsibleDocToolbar(
                 ) {
                     Text(
                         text = subtitle,
-                        color = palette.textSecondary,
-                        fontSize = VennelaTokens.caption,
+                        color = palette.textTertiary,
+                        fontSize = VennelaTokens.nano,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -1278,7 +1285,7 @@ private fun CollapsibleDocToolbar(
         }
         Box(
             Modifier.fillMaxWidth()
-                .height(2.5.dp)
+                .height(2.dp)
                 .background(palette.cardBorder.copy(alpha = 0.30f))
         ) {
             Box(
@@ -1294,7 +1301,7 @@ private fun CollapsibleDocToolbar(
 private fun ToolbarAction(icon: ImageVector, description: String, onClick: () -> Unit) {
     val palette = LocalVennelaPalette.current
     Box(
-        Modifier.size(VennelaTokens.viewerControl)
+        Modifier.size(VennelaTokens.controlSm)
             .clip(CircleShape)
             .pressScale(pressedScale = 0.90f, onClick = onClick),
         contentAlignment = Alignment.Center
@@ -1302,8 +1309,8 @@ private fun ToolbarAction(icon: ImageVector, description: String, onClick: () ->
         Icon(
             icon,
             contentDescription = description,
-            tint = palette.textPrimary,
-            modifier = Modifier.size(VennelaTokens.viewerIcon)
+            tint = palette.textSecondary,
+            modifier = Modifier.size(VennelaTokens.iconSm)
         )
     }
 }

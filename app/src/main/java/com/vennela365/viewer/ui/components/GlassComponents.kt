@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -699,6 +700,97 @@ fun VennelaBottomSheet(
     }
 }
 
+/* ------------------------------------------------------------------------- */
+/* State screens                                                              */
+/*                                                                            */
+/* Empty, error and loading share one construction: a glyph, a headline, a   */
+/* line of explanation and optional actions. Keeping them identical is what  */
+/* makes the app feel like one product rather than a pile of screens.        */
+/* ------------------------------------------------------------------------- */
+
+/** The round glyph that opens every state screen. */
+@Composable
+private fun StateGlyph(
+    icon: ImageVector,
+    tint: Color,
+    glow: Color,
+    size: Dp = 58.dp,
+    iconSize: Dp = 26.dp
+) {
+    Box(
+        modifier = Modifier
+            .size(size)
+            .shadow(
+                elevation = 14.dp,
+                shape = CircleShape,
+                clip = false,
+                ambientColor = glow.copy(alpha = 0.55f),
+                spotColor = glow.copy(alpha = 0.55f)
+            )
+            .clip(CircleShape)
+            .background(
+                Brush.linearGradient(
+                    listOf(tint.copy(alpha = 0.40f), tint.copy(alpha = 0.18f))
+                )
+            )
+            .border(1.dp, tint.copy(alpha = 0.60f), CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(iconSize))
+    }
+}
+
+/** A pill action used by the state screens. */
+@Composable
+private fun StateAction(
+    label: String,
+    primary: Boolean,
+    onClick: () -> Unit
+) {
+    val palette = LocalVennelaPalette.current
+    val accent = LocalVennelaAccent.current
+    Box(
+        modifier = Modifier
+            .then(
+                if (primary) {
+                    Modifier.shadow(
+                        elevation = 10.dp,
+                        shape = RoundedCornerShape(50),
+                        clip = false,
+                        ambientColor = accent.primary.copy(alpha = 0.60f),
+                        spotColor = accent.secondary.copy(alpha = 0.60f)
+                    )
+                } else {
+                    Modifier
+                }
+            )
+            .clip(RoundedCornerShape(50))
+            .then(
+                if (primary) {
+                    Modifier.background(
+                        Brush.horizontalGradient(listOf(accent.primary, accent.secondary))
+                    )
+                } else {
+                    Modifier.background(palette.cardSurface.copy(alpha = 0.50f))
+                }
+            )
+            .border(
+                1.dp,
+                if (primary) Color.White.copy(alpha = 0.30f) else accent.secondary.copy(alpha = 0.50f),
+                RoundedCornerShape(50)
+            )
+            .pressScale(pressedScale = 0.95f, onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = label,
+            color = if (primary) Color.White else palette.textPrimary,
+            fontSize = VennelaTokens.bodySmall,
+            fontWeight = if (primary) FontWeight.Bold else FontWeight.Medium
+        )
+    }
+}
+
 @Composable
 fun VennelaEmptyState(
     title: String,
@@ -712,55 +804,28 @@ fun VennelaEmptyState(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(28.dp),
+            .padding(VennelaTokens.spaceXl),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(
-            modifier = Modifier.size(76.dp)
-                .shadow(
-                    elevation = 20.dp,
-                    shape = CircleShape,
-                    clip = false,
-                    ambientColor = accent.secondary.copy(alpha = 0.60f),
-                    spotColor = accent.primary.copy(alpha = 0.60f)
-                )
-                .clip(CircleShape)
-                .background(
-                    Brush.linearGradient(
-                        listOf(
-                            accent.primary.copy(alpha = 0.42f),
-                            accent.secondary.copy(alpha = 0.22f)
-                        )
-                    )
-                )
-                .border(1.dp, accent.secondary.copy(alpha = 0.65f), CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(36.dp))
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(title, color = palette.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(hint, color = palette.textSecondary, fontSize = 13.sp)
+        StateGlyph(icon = icon, tint = accent.primary, glow = accent.secondary)
+        Spacer(modifier = Modifier.height(VennelaTokens.spaceMd))
+        Text(
+            text = title,
+            color = palette.textPrimary,
+            fontSize = VennelaTokens.titleSmall,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(VennelaTokens.spaceXs))
+        Text(
+            text = hint,
+            color = palette.textSecondary,
+            fontSize = VennelaTokens.bodySmall,
+            textAlign = TextAlign.Center
+        )
         if (actionLabel != null && onAction != null) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Box(
-                modifier = Modifier
-                    .shadow(
-                        elevation = 14.dp,
-                        shape = RoundedCornerShape(50),
-                        clip = false,
-                        ambientColor = accent.primary.copy(alpha = 0.70f),
-                        spotColor = accent.secondary.copy(alpha = 0.70f)
-                    )
-                    .clip(RoundedCornerShape(50))
-                    .background(Brush.horizontalGradient(listOf(accent.primary, accent.secondary)))
-                    .border(1.dp, Color.White.copy(alpha = 0.32f), RoundedCornerShape(50))
-                    .pressScale(pressedScale = 0.95f, onClick = onAction)
-                    .padding(horizontal = 24.dp, vertical = 11.dp)
-            ) {
-                Text(actionLabel, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            }
+            Spacer(modifier = Modifier.height(VennelaTokens.spaceMd))
+            StateAction(label = actionLabel, primary = true, onClick = onAction)
         }
     }
 }
@@ -794,56 +859,34 @@ fun VennelaErrorState(
                 )
             )
             .border(1.dp, errorCoral.copy(alpha = 0.65f), RoundedCornerShape(VennelaTokens.radiusSheet))
-            .padding(22.dp),
+            .padding(VennelaTokens.spaceXl),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(
-            modifier = Modifier.size(56.dp)
-                .clip(CircleShape)
-                .background(errorCoral.copy(alpha = 0.18f))
-                .border(1.dp, errorCoral.copy(alpha = 0.55f), CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = errorCoral, modifier = Modifier.size(30.dp))
-        }
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(title, color = palette.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(message, color = palette.textSecondary, fontSize = 13.sp)
+        StateGlyph(
+            icon = Icons.Default.ErrorOutline,
+            tint = errorCoral,
+            glow = errorCoral
+        )
+        Spacer(modifier = Modifier.height(VennelaTokens.spaceMd))
+        Text(
+            text = title,
+            color = palette.textPrimary,
+            fontSize = VennelaTokens.titleSmall,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(VennelaTokens.spaceXs))
+        Text(
+            text = message,
+            color = palette.textSecondary,
+            fontSize = VennelaTokens.bodySmall,
+            textAlign = TextAlign.Center
+        )
         if (onRetry != null || onDetails != null) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                onRetry?.let {
-                    Box(
-                        Modifier
-                            .shadow(
-                                elevation = 12.dp,
-                                shape = RoundedCornerShape(50),
-                                clip = false,
-                                ambientColor = accent.primary.copy(alpha = 0.65f),
-                                spotColor = accent.secondary.copy(alpha = 0.65f)
-                            )
-                            .clip(RoundedCornerShape(50))
-                            .background(Brush.horizontalGradient(listOf(accent.primary, accent.secondary)))
-                            .border(1.dp, Color.White.copy(alpha = 0.30f), RoundedCornerShape(50))
-                            .pressScale(pressedScale = 0.95f, onClick = it)
-                            .padding(horizontal = 22.dp, vertical = 10.dp)
-                    ) {
-                        Text("Retry", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-                onDetails?.let {
-                    Box(
-                        Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(palette.cardSurface.copy(alpha = 0.50f))
-                            .border(1.dp, accent.secondary.copy(alpha = 0.55f), RoundedCornerShape(50))
-                            .pressScale(pressedScale = 0.95f, onClick = it)
-                            .padding(horizontal = 22.dp, vertical = 10.dp)
-                    ) {
-                        Text("Details", color = palette.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                    }
-                }
+            Spacer(modifier = Modifier.height(VennelaTokens.spaceMd))
+            Row(horizontalArrangement = Arrangement.spacedBy(VennelaTokens.spaceSm)) {
+                onRetry?.let { StateAction(label = "Retry", primary = true, onClick = it) }
+                onDetails?.let { StateAction(label = "Details", primary = false, onClick = it) }
             }
         }
     }
@@ -858,7 +901,7 @@ fun VennelaLoadingState(
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
     Column(
-        modifier = Modifier.fillMaxWidth().padding(26.dp),
+        modifier = Modifier.fillMaxWidth().padding(VennelaTokens.spaceXl),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (progress != null) {
@@ -868,25 +911,30 @@ fun VennelaLoadingState(
                 color = accent.secondary,
                 trackColor = palette.textPrimary.copy(alpha = 0.14f)
             )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text("${(progress * 100).toInt()}% • $label", color = palette.textSecondary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            Spacer(modifier = Modifier.height(VennelaTokens.spaceSm))
+            Text(
+                text = "${(progress * 100).toInt()}% • $label",
+                color = palette.textSecondary,
+                fontSize = VennelaTokens.bodySmall,
+                fontWeight = FontWeight.Medium
+            )
         } else {
-            CircularProgressIndicator(color = accent.secondary, strokeWidth = 3.dp, modifier = Modifier.size(44.dp))
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(label, color = palette.textSecondary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            CircularProgressIndicator(
+                color = accent.secondary,
+                strokeWidth = 3.dp,
+                modifier = Modifier.size(36.dp)
+            )
+            Spacer(modifier = Modifier.height(VennelaTokens.spaceSm))
+            Text(
+                text = label,
+                color = palette.textSecondary,
+                fontSize = VennelaTokens.bodySmall,
+                fontWeight = FontWeight.Medium
+            )
         }
         if (onCancel != null) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Box(
-                Modifier
-                    .clip(RoundedCornerShape(50))
-                    .background(palette.cardSurface.copy(alpha = 0.50f))
-                    .border(1.dp, accent.secondary.copy(alpha = 0.55f), RoundedCornerShape(50))
-                    .pressScale(pressedScale = 0.95f, onClick = onCancel)
-                    .padding(horizontal = 22.dp, vertical = 9.dp)
-            ) {
-                Text("Cancel", color = palette.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-            }
+            Spacer(modifier = Modifier.height(VennelaTokens.spaceMd))
+            StateAction(label = "Cancel", primary = false, onClick = onCancel)
         }
     }
 }

@@ -10,6 +10,7 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -67,6 +68,7 @@ import com.vennela365.viewer.ui.components.SectionHeader
 import com.vennela365.viewer.ui.components.VennelaEmptyState
 import com.vennela365.viewer.ui.components.VennelaMetadataRow
 import com.vennela365.viewer.ui.components.pressScale
+import com.vennela365.viewer.ui.components.rememberLazyScrollSignal
 import com.vennela365.viewer.ui.components.staggeredEntrance
 import com.vennela365.viewer.viewmodel.MainViewModel
 import com.vennela365.viewer.viewmodel.Screen
@@ -154,6 +156,9 @@ fun UniversalSearchScreen(viewModel: MainViewModel) {
         if (trimmedQuery.length < 2) emptyList() else FormatRegistry.search(trimmedQuery).take(6)
     }
 
+    // The header slides away while the results scroll down.
+    val searchListState = rememberLazyListState()
+
     val groupedResults = remember(filteredFiles) {
         val byCategory = filteredFiles.groupBy { it.formatInfo.category }
         searchCategoryOrder.mapNotNull { category ->
@@ -178,6 +183,7 @@ fun UniversalSearchScreen(viewModel: MainViewModel) {
     }
 
     LiquidPage(
+        scrollState = rememberLazyScrollSignal(searchListState),
         dock = {
             FloatingDockNav(
                 activeTab = "search",
@@ -194,6 +200,7 @@ fun UniversalSearchScreen(viewModel: MainViewModel) {
         }
     ) { pagePadding ->
         LazyColumn(
+            state = searchListState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 top = VennelaTokens.spaceXs,
