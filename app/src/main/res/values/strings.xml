@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Vennela 365</string>
+    <string name="app_subtitle">Universal File Viewer</string>
+    <string name="provider_authority">com.vennela365.viewer.fileprovider</string>
+</resources>

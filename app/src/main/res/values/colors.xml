@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Aurora Lumen: matches VennelaPalette.backgroundBottom so the first
+         frame is a luminous indigo instead of a near-black flash. -->
+    <color name="vennela_window_background">#FF0C102F</color>
+</resources>
