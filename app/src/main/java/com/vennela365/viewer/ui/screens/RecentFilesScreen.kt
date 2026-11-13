@@ -55,6 +55,8 @@ import com.vennela365.viewer.storage.ShareUri
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
 import com.vennela365.viewer.theme.LiquidMotion
+import androidx.compose.ui.platform.testTag
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.theme.liquidGlass
 import com.vennela365.viewer.theme.liquidGlassSpec
@@ -193,9 +195,15 @@ fun RecentFilesScreen(viewModel: MainViewModel) {
             )
         }
     ) { pagePadding ->
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.TopCenter
+        ) {
         LazyColumn(
             state = recentListState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = 860.dp),
             contentPadding = PaddingValues(
                 top = VennelaTokens.spaceXs,
                 bottom = pagePadding.calculateBottomPadding()
@@ -258,11 +266,13 @@ fun RecentFilesScreen(viewModel: MainViewModel) {
                     HeaderAction(
                         icon = Icons.Default.Search,
                         contentDescription = "Search files",
+                        modifier = Modifier.testTag("recents_search_button"),
                         onClick = { viewModel.navigateTo(Screen.UniversalSearch) }
                     )
                     HeaderAction(
                         icon = Icons.Default.FilterList,
                         contentDescription = "Sort and filter",
+                        modifier = Modifier.testTag("recents_filter_button"),
                         onClick = { showSheet = true }
                     )
                 }
@@ -372,6 +382,7 @@ fun RecentFilesScreen(viewModel: MainViewModel) {
                 Spacer(modifier = Modifier.height(VennelaTokens.spaceLg))
             }
         }
+        }
     }
 
     // ---- Working sort / filter glass sheet ----
@@ -457,7 +468,9 @@ fun RecentFilesScreen(viewModel: MainViewModel) {
                     SheetPill(
                         label = "Reset",
                         icon = Icons.Default.RestartAlt,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("recents_sheet_reset")
                     ) {
                         selectedFilter = "All"
                         viewModel.setSortMode(SortMode.DATE_NEWEST)
@@ -466,7 +479,9 @@ fun RecentFilesScreen(viewModel: MainViewModel) {
                         label = "Done",
                         icon = Icons.Default.Check,
                         active = true,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("recents_sheet_done")
                     ) {
                         showSheet = false
                     }
@@ -535,7 +550,7 @@ fun RecentFilesScreen(viewModel: MainViewModel) {
                 }
                 Spacer(modifier = Modifier.height(VennelaTokens.spaceMd))
                 GlassDivider()
-                VennelaMetadataRow("Kind", "$file.extension.uppercase() - ${file.formatInfo.category.displayName}")
+                VennelaMetadataRow("Kind", "${file.extension.uppercase()} · ${file.formatInfo.category.displayName}")
                 VennelaMetadataRow("Size", file.formattedSize)
                 VennelaMetadataRow("Modified", file.formattedDate)
                 VennelaMetadataRow("Support", file.formatInfo.supportLevel.label)
@@ -564,12 +579,13 @@ fun RecentFilesScreen(viewModel: MainViewModel) {
 private fun HeaderAction(
     icon: ImageVector,
     contentDescription: String,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(VennelaTokens.touchTargetMin)
             .pressScale(0.90f, onClick),
         contentAlignment = Alignment.Center
@@ -682,6 +698,7 @@ private fun RecentsSummaryCard(
                 Text(
                     "${(fraction.value * 100f).roundToInt()}%",
                     color = accent.secondary,
+                    fontFamily = VennelaFonts.Mono,
                     fontSize = VennelaTokens.caption,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(end = VennelaTokens.spaceSm)
@@ -689,6 +706,7 @@ private fun RecentsSummaryCard(
                 Text(
                     recentsFormatBytes(totalBytes),
                     color = palette.textSecondary,
+                    fontFamily = VennelaFonts.Mono,
                     fontSize = VennelaTokens.caption,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -974,8 +992,9 @@ fun RecentFileCard(
             )
             Spacer(modifier = Modifier.height(VennelaTokens.spaceXxs))
             Text(
-                text = "${file.formatInfo.name} - ${file.formattedSize} - ${file.formattedDate}",
+                text = "${file.formatInfo.name} · ${file.formattedSize} · ${file.formattedDate}",
                 color = palette.textSecondary,
+                fontFamily = VennelaFonts.Mono,
                 fontSize = VennelaTokens.caption,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,

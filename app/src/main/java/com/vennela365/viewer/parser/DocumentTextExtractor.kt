@@ -24,21 +24,27 @@ object DocumentTextExtractor {
     private const val MAX_CHARS = 400_000
     private const val MAX_ENTRY_BYTES = 8 * 1024 * 1024
 
-    suspend fun readPlainText(context: Context, uri: Uri?): String = withContext(Dispatchers.IO) {
+    suspend fun readPlainText(context: Context, uri: Uri?, extension: String = ""): String = withContext(Dispatchers.IO) {
         if (uri == null) return@withContext ""
-        val cacheKey = "plain_${uri}"
+        val ext = extension.lowercase().removePrefix(".")
+        val cacheKey = "plain_${uri}_${ext}"
         VennelaCacheManager.getCachedText(cacheKey)?.let { return@withContext it }
 
         val text = runCatching {
-            context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { reader ->
-                val buffer = CharArray(MAX_CHARS)
-                var total = 0
-                while (total < buffer.size) {
-                    val read = reader.read(buffer, total, buffer.size - total)
-                    if (read <= 0) break
-                    total += read
+            context.contentResolver.openInputStream(uri)?.use { rawStream ->
+                val effectiveStream = if (ext == "svgz" || ext == "gz") {
+                    java.util.zip.GZIPInputStream(rawStream)
+                } else rawStream
+                effectiveStream.bufferedReader(Charsets.UTF_8).use { reader ->
+                    val buffer = CharArray(MAX_CHARS)
+                    var total = 0
+                    while (total < buffer.size) {
+                        val read = reader.read(buffer, total, buffer.size - total)
+                        if (read <= 0) break
+                        total += read
+                    }
+                    if (total <= 0) "" else String(buffer, 0, total)
                 }
-                if (total <= 0) "" else String(buffer, 0, total)
             }.orEmpty()
         }.getOrDefault("")
 

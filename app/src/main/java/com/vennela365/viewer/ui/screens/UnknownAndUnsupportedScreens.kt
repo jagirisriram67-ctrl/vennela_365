@@ -16,9 +16,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -59,8 +61,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -71,6 +73,7 @@ import com.vennela365.viewer.parser.FileParserManager
 import com.vennela365.viewer.registry.FormatCategory
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.theme.liquidGlassSpec
 import com.vennela365.viewer.theme.liquidGlass
@@ -226,8 +229,16 @@ fun UnknownFileViewerScreen(viewModel: MainViewModel) {
             )
         },
         topBarActions = {
-            RoundBarAction(Icons.Default.Search, "Search files") { viewModel.navigateTo(Screen.UniversalSearch) }
-            RoundBarAction(Icons.Default.Info, "File metadata") { viewModel.navigateTo(Screen.FileMetadata) }
+            RoundBarAction(
+                icon = Icons.Default.Search,
+                description = "Search files",
+                modifier = Modifier.testTag("unknown_search_button")
+            ) { viewModel.navigateTo(Screen.UniversalSearch) }
+            RoundBarAction(
+                icon = Icons.Default.Info,
+                description = "File metadata",
+                modifier = Modifier.testTag("unknown_info_button")
+            ) { viewModel.navigateTo(Screen.FileMetadata) }
         }
     ) { pagePadding ->
         if (file == null) {
@@ -266,9 +277,12 @@ fun UnknownFileViewerScreen(viewModel: MainViewModel) {
         }
         val readError = hexRows.firstOrNull { it.offset == "ERROR" }
 
-                val visibleRows = remember(hexRows, hexStart) { hexRows.drop(hexStart).take(512) }
+        val visibleRows = remember(hexRows, hexStart) { hexRows.drop(hexStart).take(512) }
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = 880.dp),
             contentPadding = PaddingValues(
                 start = VennelaTokens.gutter,
                 end = VennelaTokens.gutter,
@@ -287,6 +301,7 @@ fun UnknownFileViewerScreen(viewModel: MainViewModel) {
                             Text(
                                 text = file.name,
                                 color = palette.textPrimary,
+                                fontFamily = VennelaFonts.Sans,
                                 fontSize = VennelaTokens.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
@@ -296,6 +311,7 @@ fun UnknownFileViewerScreen(viewModel: MainViewModel) {
                             Text(
                                 text = "${file.formattedSize} • ${String.format(Locale.US, "%,d", file.sizeBytes)} bytes",
                                 color = palette.textSecondary,
+                                fontFamily = VennelaFonts.Mono,
                                 fontSize = VennelaTokens.bodySmall
                             )
                         }
@@ -364,7 +380,7 @@ fun UnknownFileViewerScreen(viewModel: MainViewModel) {
                                     },
                                     color = palette.textTertiary,
                                     fontSize = VennelaTokens.nano,
-                                    fontFamily = FontFamily.Monospace
+                                    fontFamily = VennelaFonts.Mono
                                 )
                             }
                         }
@@ -388,7 +404,10 @@ fun UnknownFileViewerScreen(viewModel: MainViewModel) {
                                     else -> activeTab = tab
                                 }
                             },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = VennelaTokens.touchTargetMin)
+                                .testTag("unknown_tab_${tab.lowercase()}")
                         )
                     }
                 }
@@ -475,6 +494,9 @@ fun UnknownFileViewerScreen(viewModel: MainViewModel) {
                             LiquidChip(
                                 text = if (rawOnly) "ASCII only" else "Hex + ASCII",
                                 isActive = rawOnly,
+                                modifier = Modifier
+                                    .heightIn(min = VennelaTokens.touchTargetMin)
+                                    .testTag("unknown_hex_mode_chip"),
                                 onClick = { rawOnly = !rawOnly }
                             )
                         }
@@ -487,11 +509,14 @@ fun UnknownFileViewerScreen(viewModel: MainViewModel) {
                             InlineOffsetField(
                                 value = jumpTarget,
                                 onValueChange = { jumpTarget = it },
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("unknown_offset_field")
                             )
                             SmallAction(
                                 label = "Go to",
                                 icon = Icons.Default.MyLocation,
+                                modifier = Modifier.testTag("unknown_goto_button"),
                                 onClick = {
                                     val wanted = jumpTarget.trim().removePrefix("0x").uppercase()
                                     val parsed = wanted.toLongOrNull(16)
@@ -617,6 +642,7 @@ fun UnknownFileViewerScreen(viewModel: MainViewModel) {
 
             item(key = "footer") { Spacer(Modifier.height(VennelaTokens.spaceSm)) }
         }
+        }
     }
 }
 
@@ -652,8 +678,16 @@ fun UnsupportedFileScreen(viewModel: MainViewModel) {
             )
         },
         topBarActions = {
-            RoundBarAction(Icons.Default.Search, "Search files") { viewModel.navigateTo(Screen.UniversalSearch) }
-            RoundBarAction(Icons.Default.Info, "File metadata") { viewModel.navigateTo(Screen.FileMetadata) }
+            RoundBarAction(
+                icon = Icons.Default.Search,
+                description = "Search files",
+                modifier = Modifier.testTag("unsupported_search_button")
+            ) { viewModel.navigateTo(Screen.UniversalSearch) }
+            RoundBarAction(
+                icon = Icons.Default.Info,
+                description = "File metadata",
+                modifier = Modifier.testTag("unsupported_info_button")
+            ) { viewModel.navigateTo(Screen.FileMetadata) }
         }
     ) { pagePadding ->
         if (file == null) {
@@ -685,8 +719,11 @@ fun UnsupportedFileScreen(viewModel: MainViewModel) {
         val bytes = remember(hexRows) { sniffBytes(hexRows) }
         val guess = remember(bytes, file.id) { guessContent(bytes, file) }
 
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = 880.dp),
             contentPadding = PaddingValues(
                 start = VennelaTokens.gutter,
                 end = VennelaTokens.gutter,
@@ -759,12 +796,16 @@ fun UnsupportedFileScreen(viewModel: MainViewModel) {
                                 label = "View as Text",
                                 onClick = { viewModel.navigateTo(Screen.CodeViewer) },
                                 icon = Icons.Default.Description,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("unsupported_view_text_button")
                             )
                             OutlinedGlassAction(
                                 label = "Open with App",
                                 icon = Icons.AutoMirrored.Filled.OpenInNew,
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("unsupported_open_with_button"),
                                 onClick = { openWithAnotherApp(context, file) }
                             )
                         }
@@ -893,6 +934,7 @@ fun UnsupportedFileScreen(viewModel: MainViewModel) {
                         SmallAction(
                             label = "Copy",
                             icon = Icons.Default.ContentCopy,
+                            modifier = Modifier.testTag("unsupported_copy_hex_button"),
                             onClick = {
                                 copyRawToClipboard(context, hexTextOf(hexRows, 64), "Hex preview copied")
                             }
@@ -989,6 +1031,7 @@ fun UnsupportedFileScreen(viewModel: MainViewModel) {
 
             item(key = "footer") { Spacer(Modifier.height(VennelaTokens.spaceSm)) }
         }
+        }
     }
 }
 
@@ -997,10 +1040,15 @@ fun UnsupportedFileScreen(viewModel: MainViewModel) {
 /* ------------------------------------------------------------------------- */
 
 @Composable
-private fun RoundBarAction(icon: ImageVector, description: String, onClick: () -> Unit) {
+private fun RoundBarAction(
+    icon: ImageVector,
+    description: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
     val palette = LocalVennelaPalette.current
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(VennelaTokens.touchTargetMin)
             .clip(CircleShape)
             .pressScale(0.9f, onClick),
@@ -1076,14 +1124,14 @@ private fun HexLine(
                 text = row.offset,
                 color = if (isError) accent.secondary else palette.textTertiary,
                 fontSize = VennelaTokens.nano,
-                fontFamily = FontFamily.Monospace
+                fontFamily = VennelaFonts.Mono
             )
             Spacer(Modifier.width(VennelaTokens.spaceSm))
             Text(
                 text = row.ascii,
                 color = accent.secondary,
                 fontSize = VennelaTokens.nano,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = VennelaFonts.Mono,
                 maxLines = 1,
                 overflow = TextOverflow.Clip,
                 modifier = Modifier.weight(1f)
@@ -1094,7 +1142,7 @@ private fun HexLine(
                 text = row.hexBytes,
                 color = palette.textSecondary,
                 fontSize = VennelaTokens.nano,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = VennelaFonts.Mono,
                 maxLines = 1,
                 overflow = TextOverflow.Clip
             )
@@ -1133,7 +1181,7 @@ private fun InlineOffsetField(
             textStyle = TextStyle(
                 color = palette.textPrimary,
                 fontSize = VennelaTokens.bodySmall,
-                fontFamily = FontFamily.Monospace
+                fontFamily = VennelaFonts.Mono
             ),
             cursorBrush = SolidColor(accent.secondary),
             modifier = Modifier.weight(1f),
@@ -1143,7 +1191,7 @@ private fun InlineOffsetField(
                         text = "Hex offset, e.g. 00000100",
                         color = palette.textTertiary,
                         fontSize = VennelaTokens.caption,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = VennelaFonts.Mono
                     )
                 }
                 inner()
@@ -1153,11 +1201,16 @@ private fun InlineOffsetField(
 }
 
 @Composable
-private fun SmallAction(label: String, icon: ImageVector, onClick: () -> Unit) {
+private fun SmallAction(
+    label: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
     Row(
-        modifier = Modifier
+        modifier = modifier
             .height(VennelaTokens.touchTargetMin)
             .clip(RoundedCornerShape(VennelaTokens.radiusPill))
             .background(accent.primary.copy(alpha = 0.22f))
@@ -1171,6 +1224,7 @@ private fun SmallAction(label: String, icon: ImageVector, onClick: () -> Unit) {
         Text(
             text = label,
             color = palette.textPrimary,
+            fontFamily = VennelaFonts.Sans,
             fontSize = VennelaTokens.caption,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1
@@ -1232,6 +1286,7 @@ private fun FallbackActionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = VennelaTokens.touchTargetMin)
             .clip(RoundedCornerShape(VennelaTokens.radiusControl))
             .pressScale(0.98f, onClick)
             .padding(vertical = VennelaTokens.spaceSm),
@@ -1377,7 +1432,7 @@ private fun RegexMatches(
                     text = "${index + 1}  $line",
                     color = palette.textPrimary,
                     fontSize = VennelaTokens.nano,
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = VennelaFonts.Mono,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -1419,14 +1474,14 @@ private fun RegexMatches(
                             text = "${index + 1}",
                             color = palette.textTertiary,
                             fontSize = VennelaTokens.nano,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = VennelaFonts.Mono,
                             modifier = Modifier.width(34.dp)
                         )
                         Text(
                             text = line.trim().take(200),
                             color = palette.textPrimary,
                             fontSize = VennelaTokens.nano,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = VennelaFonts.Mono,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -1481,11 +1536,13 @@ private fun UnknownToolsDock(
             Triple("Go to", Icons.Default.MyLocation, onGoTo),
             Triple("More", Icons.Default.Tune, onMore)
         )
-        items.forEach { (label, icon, action) ->
+        val tags = listOf("unknown_dock_search", "unknown_dock_encoding", "unknown_dock_goto", "unknown_dock_more")
+        items.forEachIndexed { index, (label, icon, action) ->
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .height(VennelaTokens.touchTargetMin + 8.dp)
+                    .testTag(tags[index])
                     .clip(RoundedCornerShape(VennelaTokens.radiusControl))
                     .pressScale(0.94f, action),
                 horizontalAlignment = Alignment.CenterHorizontally,

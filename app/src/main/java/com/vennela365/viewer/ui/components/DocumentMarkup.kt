@@ -11,6 +11,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextIndent
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
+import com.vennela365.viewer.theme.VennelaFonts
 
 /** One search hit, addressed in the *source* text that was passed to [DocumentMarkup]. */
 data class DocumentHighlight(val start: Int, val end: Int, val primary: Boolean)
@@ -37,7 +38,10 @@ object DocumentMarkup {
         val muted: Color,
         val accent: Color,
         val tableTint: Color,
-        val isDarkPaper: Boolean = false
+        val isDarkPaper: Boolean = false,
+        val headingFont: FontFamily = VennelaFonts.Serif,
+        val bodyFont: FontFamily = VennelaFonts.Serif,
+        val monoFont: FontFamily = VennelaFonts.Mono
     )
 
     private const val BOLD_WEIGHT = 700
@@ -59,7 +63,7 @@ object DocumentMarkup {
 
         val base = typography.bodySize.value
         val builder = RichBuilder()
-        val ink = SpanStyle(color = typography.ink)
+        val ink = SpanStyle(color = typography.ink, fontFamily = typography.bodyFont)
 
         var cursor = 0
         while (cursor <= source.length) {
@@ -77,9 +81,9 @@ object DocumentMarkup {
                         val level = match.groupValues[1].length
                         val text = match.groupValues[2].trim()
                         val factor = when (level) {
-                            1 -> 1.8f
-                            2 -> 1.45f
-                            3 -> 1.22f
+                            1 -> 1.75f
+                            2 -> 1.42f
+                            3 -> 1.20f
                             else -> 1.08f
                         }
                         builder.blankLineIfNeeded()
@@ -87,12 +91,13 @@ object DocumentMarkup {
                             srcStart = textStart + trimmed.indexOf(text).coerceAtLeast(0),
                             text = text,
                             span = SpanStyle(
-                                color = typography.ink,
+                                color = if (level <= 2) typography.ink else typography.ink.copy(alpha = 0.94f),
+                                fontFamily = typography.headingFont,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = (base * factor).sp,
-                                letterSpacing = (-0.2).sp
+                                letterSpacing = (-0.25).sp
                             ),
-                            paragraph = ParagraphStyle(lineHeight = (base * factor * 1.32f).sp)
+                            paragraph = ParagraphStyle(lineHeight = (base * factor * 1.28f).sp)
                         )
                         builder.append(cursor + line.length, "\n\n", null)
                         cursor = end + 1
@@ -106,6 +111,7 @@ object DocumentMarkup {
                             text = trimmed.uppercase(),
                             span = SpanStyle(
                                 color = typography.accent,
+                                fontFamily = VennelaFonts.Sans,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = (base * 0.78f).sp,
                                 letterSpacing = 1.2.sp
@@ -124,6 +130,7 @@ object DocumentMarkup {
                             text = trimmed.replace("─", "").trim(),
                             span = SpanStyle(
                                 color = typography.accent,
+                                fontFamily = VennelaFonts.Sans,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = (base * 0.82f).sp,
                                 letterSpacing = 0.8.sp
@@ -145,7 +152,7 @@ object DocumentMarkup {
                         val glyph = match.groupValues[1]
                         val body = match.groupValues[2]
                         val dot = if (glyph == "-" || glyph == "*" || glyph == "+") "•" else glyph
-                        builder.append(textStart, "$dot  ", SpanStyle(color = typography.accent.copy(alpha = 0.85f)))
+                        builder.append(textStart, "$dot  ", SpanStyle(color = typography.accent.copy(alpha = 0.88f), fontWeight = FontWeight.Bold))
                         builder.appendInline(
                             line = body,
                             lineStart = textStart + trimmed.indexOf(body).coerceAtLeast(0),
@@ -153,7 +160,7 @@ object DocumentMarkup {
                             typography = typography,
                             paragraph = ParagraphStyle(
                                 textIndent = TextIndent(restLine = (base * 0.85f).sp),
-                                lineHeight = (base * 1.5f).sp
+                                lineHeight = (base * 1.52f).sp
                             )
                         )
                     }
@@ -163,7 +170,7 @@ object DocumentMarkup {
                         val marker = match.groupValues[1]
                         val body = match.groupValues[2]
                         val bodyStart = textStart + trimmed.indexOf(body).coerceAtLeast(0)
-                        builder.append(textStart, "$marker  ", SpanStyle(color = typography.accent.copy(alpha = 0.9f), fontWeight = FontWeight.SemiBold))
+                        builder.append(textStart, "$marker  ", SpanStyle(color = typography.accent.copy(alpha = 0.92f), fontFamily = typography.monoFont, fontWeight = FontWeight.SemiBold))
                         builder.appendInline(
                             line = body,
                             lineStart = bodyStart,
@@ -171,7 +178,7 @@ object DocumentMarkup {
                             typography = typography,
                             paragraph = ParagraphStyle(
                                 textIndent = TextIndent(restLine = (base * 1.2f).sp),
-                                lineHeight = (base * 1.5f).sp
+                                lineHeight = (base * 1.52f).sp
                             )
                         )
                     }
@@ -179,15 +186,15 @@ object DocumentMarkup {
                     quote.matches(trimmed) -> {
                         val body = quote.find(trimmed)!!.groupValues[1]
                         val bodyStart = cursor + line.indexOf(body).coerceAtLeast(0)
-                        builder.append(textStart, "\u201C", SpanStyle(color = typography.muted, fontWeight = FontWeight.Bold))
+                        builder.append(textStart, "\u201C", SpanStyle(color = typography.accent, fontFamily = typography.headingFont, fontWeight = FontWeight.Bold))
                         builder.appendInline(
                             line = body,
                             lineStart = bodyStart,
-                            base = SpanStyle(color = typography.muted, fontStyle = FontStyle.Italic),
+                            base = SpanStyle(color = typography.muted, fontFamily = typography.bodyFont, fontStyle = FontStyle.Italic),
                             typography = typography,
-                            paragraph = ParagraphStyle(lineHeight = (base * 1.5f).sp)
+                            paragraph = ParagraphStyle(lineHeight = (base * 1.52f).sp)
                         )
-                        builder.append(textStart, "\u201D", SpanStyle(color = typography.muted, fontWeight = FontWeight.Bold))
+                        builder.append(textStart, "\u201D", SpanStyle(color = typography.accent, fontFamily = typography.headingFont, fontWeight = FontWeight.Bold))
                     }
 
                     trimmed.count { it == '|' } >= 2 -> {
@@ -196,10 +203,11 @@ object DocumentMarkup {
                             text = trimmed,
                             span = SpanStyle(
                                 color = typography.ink,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = (base * 0.86f).sp
+                                fontFamily = typography.monoFont,
+                                fontSize = (base * 0.84f).sp,
+                                background = typography.tableTint
                             ),
-                            paragraph = ParagraphStyle(lineHeight = (base * 1.35f).sp)
+                            paragraph = ParagraphStyle(lineHeight = (base * 1.38f).sp)
                         )
                     }
 
@@ -210,6 +218,7 @@ object DocumentMarkup {
                             text = trimmed,
                             span = SpanStyle(
                                 color = typography.ink,
+                                fontFamily = typography.headingFont,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = (base * 1.15f).sp,
                                 letterSpacing = 0.3.sp
@@ -225,7 +234,11 @@ object DocumentMarkup {
                         builder.appendLine(
                             srcStart = textStart,
                             text = trimmed,
-                            span = SpanStyle(color = typography.ink, fontWeight = FontWeight.SemiBold)
+                            span = SpanStyle(
+                                color = typography.ink,
+                                fontFamily = typography.headingFont,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         )
                     }
 
@@ -234,7 +247,7 @@ object DocumentMarkup {
                         lineStart = textStart,
                         base = ink,
                         typography = typography,
-                        paragraph = ParagraphStyle(lineHeight = (base * 1.5f).sp)
+                        paragraph = ParagraphStyle(lineHeight = (base * 1.52f).sp)
                     )
                 }
             }
@@ -356,8 +369,8 @@ object DocumentMarkup {
                 val extra = when (pair) {
                     "**", "__" -> SpanStyle(fontWeight = FontWeight(BOLD_WEIGHT), color = typography.ink)
                     "`" -> SpanStyle(
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = (typography.bodySize.value * 0.92f).sp,
+                        fontFamily = typography.monoFont,
+                        fontSize = (typography.bodySize.value * 0.90f).sp,
                         background = typography.tableTint
                     )
                     else -> SpanStyle(fontStyle = FontStyle.Italic)

@@ -56,6 +56,8 @@ import com.vennela365.viewer.registry.FormatRegistry
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
 import com.vennela365.viewer.theme.LiquidMotion
+import androidx.compose.ui.platform.testTag
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.theme.liquidGlass
 import com.vennela365.viewer.theme.liquidGlassSpec
@@ -199,9 +201,15 @@ fun UniversalSearchScreen(viewModel: MainViewModel) {
             )
         }
     ) { pagePadding ->
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.TopCenter
+        ) {
         LazyColumn(
             state = searchListState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = 860.dp),
             contentPadding = PaddingValues(
                 top = VennelaTokens.spaceXs,
                 bottom = pagePadding.calculateBottomPadding()
@@ -226,6 +234,7 @@ fun UniversalSearchScreen(viewModel: MainViewModel) {
                 ) {
                     Box(
                         modifier = Modifier
+                            .testTag("search_back_button")
                             .size(VennelaTokens.badgeMd)
                             .shadow(
                                 elevation = 12.dp,
@@ -361,7 +370,9 @@ fun UniversalSearchScreen(viewModel: MainViewModel) {
                             text = chip.label,
                             icon = chip.icon,
                             isActive = selectedFilter == chip.label,
-                            modifier = Modifier.staggeredEntrance(searchFilters.indexOf(chip)),
+                            modifier = Modifier
+                                .testTag("search_filter_chip_${chip.label.lowercase()}")
+                                .staggeredEntrance(searchFilters.indexOf(chip)),
                             onClick = { selectedFilter = chip.label }
                         )
                     }
@@ -505,6 +516,7 @@ fun UniversalSearchScreen(viewModel: MainViewModel) {
                 Spacer(modifier = Modifier.height(VennelaTokens.spaceXl))
             }
         }
+        }
     }
 
     infoFile?.let { file ->
@@ -545,7 +557,7 @@ fun UniversalSearchScreen(viewModel: MainViewModel) {
                 }
                 Spacer(modifier = Modifier.height(VennelaTokens.spaceMd))
                 GlassDivider()
-                VennelaMetadataRow("Type", "$file.extension.uppercase() - ${file.formatInfo.category.displayName}")
+                VennelaMetadataRow("Type", "${file.extension.uppercase()} · ${file.formatInfo.category.displayName}")
                 VennelaMetadataRow("Size", file.formattedSize)
                 VennelaMetadataRow("Modified", file.formattedDate)
                 VennelaMetadataRow("Support", file.formatInfo.supportLevel.label)
@@ -553,6 +565,7 @@ fun UniversalSearchScreen(viewModel: MainViewModel) {
                 Spacer(modifier = Modifier.height(VennelaTokens.spaceMd))
                 Row(
                     modifier = Modifier
+                        .testTag("search_open_sheet_file_button")
                         .fillMaxWidth()
                         .shadow(
                             elevation = 16.dp,
@@ -687,12 +700,17 @@ private fun LargeSearchField(
             onValueChange = onQueryChange,
             singleLine = true,
             interactionSource = interaction,
-            textStyle = TextStyle(color = palette.textPrimary, fontSize = 17.sp),
+            textStyle = TextStyle(
+                color = palette.textPrimary,
+                fontFamily = VennelaFonts.Sans,
+                fontSize = 17.sp
+            ),
             cursorBrush = SolidColor(accent.secondary),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
             modifier = Modifier
                 .weight(1f)
+                .testTag("search_input_field")
                 .padding(vertical = 16.dp),
             decorationBox = { innerTextField ->
                 Box {
@@ -700,6 +718,7 @@ private fun LargeSearchField(
                         Text(
                             text = "Search files, folders, formats...",
                             color = palette.textTertiary,
+                            fontFamily = VennelaFonts.Sans,
                             fontSize = 17.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -712,6 +731,7 @@ private fun LargeSearchField(
         if (query.isNotEmpty()) {
             Box(
                 modifier = Modifier
+                    .testTag("search_clear_button")
                     .size(VennelaTokens.touchTargetMin)
                     .clip(CircleShape)
                     .pressScale(0.88f) { onQueryChange("") },
@@ -904,8 +924,9 @@ fun SearchResultCard(
             )
             Spacer(modifier = Modifier.height(VennelaTokens.spaceXxs))
             Text(
-                text = "${file.formatInfo.name} - ${file.formattedSize} - ${file.formattedDate}",
+                text = "${file.formatInfo.name} · ${file.formattedSize} · ${file.formattedDate}",
                 color = palette.textSecondary,
+                fontFamily = VennelaFonts.Mono,
                 fontSize = VennelaTokens.caption,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis

@@ -5,10 +5,18 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.view.WindowManager
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,8 +31,12 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -47,7 +59,9 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Slideshow
 import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -55,6 +69,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -64,7 +79,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -76,8 +93,10 @@ import com.vennela365.viewer.parser.PresentationParser
 import com.vennela365.viewer.parser.Slide
 import com.vennela365.viewer.rendering.ViewerState
 import com.vennela365.viewer.storage.ShareUri
+import com.vennela365.viewer.theme.LiquidMotion
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.ui.components.AnimatedDisclosure
 import com.vennela365.viewer.ui.components.FloatingDockNav
@@ -88,15 +107,23 @@ import com.vennela365.viewer.ui.components.IconBadge
 import com.vennela365.viewer.ui.components.LiquidChip
 import com.vennela365.viewer.ui.components.LiquidPage
 import com.vennela365.viewer.ui.components.PresentationStage
-import com.vennela365.viewer.ui.components.ViewerDock
-import com.vennela365.viewer.ui.components.ViewerDockAction
 import com.vennela365.viewer.ui.components.ReaderIconButton
 import com.vennela365.viewer.ui.components.ReaderTopToolbar
-import com.vennela365.viewer.ui.components.ViewerTopBar
 import com.vennela365.viewer.ui.components.SectionHeader
+import com.vennela365.viewer.ui.components.SuiteCommandHeader
+import com.vennela365.viewer.ui.components.SuiteFooterStatusBar
+import com.vennela365.viewer.ui.components.ViewerDock
+import com.vennela365.viewer.ui.components.ViewerDockAction
+import com.vennela365.viewer.ui.components.ViewerKind
+import com.vennela365.viewer.ui.components.ViewerSuiteStyle
+import com.vennela365.viewer.ui.components.ViewerTopBar
+import com.vennela365.viewer.ui.components.WpsPaperTone
 import com.vennela365.viewer.ui.components.pressScale
+import com.vennela365.viewer.ui.components.rememberSuiteSessionState
 import com.vennela365.viewer.viewmodel.MainViewModel
 import com.vennela365.viewer.viewmodel.Screen
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 
 private enum class DeckPane { NONE, OUTLINE, INFO }
 
@@ -108,6 +135,7 @@ private enum class DeckPane { NONE, OUTLINE, INFO }
  * in-deck search. Formats that are binary containers rather than decomposed XML
  * are reported honestly instead of being faked.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PresentationViewerScreen(viewModel: MainViewModel) {
     val context = LocalContext.current
@@ -116,6 +144,8 @@ fun PresentationViewerScreen(viewModel: MainViewModel) {
 
     val selectedFile by viewModel.selectedFile.collectAsStateWithLifecycle()
     val viewerState by viewModel.viewerState.collectAsStateWithLifecycle()
+    val activeSuite by viewModel.preferredSuiteStyle.collectAsStateWithLifecycle()
+    val suiteSession = rememberSuiteSessionState(activeSuite, palette.isDark)
     val file = selectedFile
 
     val deckState = produceState<DeckLoad>(initialValue = DeckLoad.Loading, file?.id) {
@@ -137,6 +167,7 @@ fun PresentationViewerScreen(viewModel: MainViewModel) {
     var findQuery by remember { mutableStateOf("") }
     var textScale by remember { mutableStateOf(1f) }
     var presenting by remember { mutableStateOf(false) }
+    var showGridSheet by remember { mutableStateOf(false) }
 
     val deck = (deckState.value as? DeckLoad.Ready)?.deck
     val slideCount = deck?.slides?.size ?: 0
@@ -161,12 +192,14 @@ fun PresentationViewerScreen(viewModel: MainViewModel) {
                 ViewerDockAction(
                     Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Previous slide",
-                    enabled = safeIndex > 0
+                    enabled = safeIndex > 0,
+                    modifier = Modifier.testTag("deck_prev_button")
                 ) { index = (safeIndex - 1).coerceAtLeast(0) }
                 Box(Modifier.weight(1.1f), contentAlignment = Alignment.Center) {
                     Text(
                         text = if (slideCount == 0) "0 / 0" else "${safeIndex + 1} / $slideCount",
                         color = palette.textSecondary,
+                        fontFamily = VennelaFonts.Mono,
                         fontSize = VennelaTokens.micro,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -174,106 +207,166 @@ fun PresentationViewerScreen(viewModel: MainViewModel) {
                 ViewerDockAction(
                     Icons.AutoMirrored.Filled.ArrowForward,
                     contentDescription = "Next slide",
-                    enabled = slideCount > 0 && safeIndex < slideCount - 1
+                    enabled = slideCount > 0 && safeIndex < slideCount - 1,
+                    modifier = Modifier.testTag("deck_next_button")
                 ) { index = (safeIndex + 1).coerceAtMost(slideCount - 1) }
                 ViewerDockAction(
                     Icons.Default.Slideshow,
                     contentDescription = "Present slide show",
                     active = presenting,
-                    enabled = slideCount > 0
+                    enabled = slideCount > 0,
+                    modifier = Modifier.testTag("deck_present_button")
                 ) { presenting = true }
+                ViewerDockAction(
+                    Icons.Default.GridView,
+                    contentDescription = "Slide sorter grid",
+                    active = showGridSheet,
+                    enabled = slideCount > 0,
+                    modifier = Modifier.testTag("deck_grid_button")
+                ) { showGridSheet = true }
                 ViewerDockAction(
                     Icons.AutoMirrored.Filled.FormatListBulleted,
                     contentDescription = "Slide outline",
                     active = pane == DeckPane.OUTLINE,
-                    enabled = slideCount > 0
+                    enabled = slideCount > 0,
+                    modifier = Modifier.testTag("deck_outline_button")
                 ) { pane = if (pane == DeckPane.OUTLINE) DeckPane.NONE else DeckPane.OUTLINE }
             }
         }
     ) { pagePadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            // Floating, slim deck toolbar — the slide owns the screen.
-            ViewerTopBar(
-                title = file?.name ?: "Presentation",
-                subtitle = when (val state = deckState.value) {
-                    is DeckLoad.Loading -> "Reading slides…"
-                    is DeckLoad.Ready -> "${state.deck.slides.size} slides"
-                    is DeckLoad.Unsupported -> "Text outline unavailable"
-                    is DeckLoad.Failed -> "Could not open"
-                },
-                onBack = { viewModel.navigateBack() },
-                modifier = Modifier,
-                progress = if (slideCount > 0) (safeIndex + 1).toFloat() / slideCount else null
-            ) {
-                ReaderIconButton(
-                    icon = Icons.Default.Search,
-                    contentDescription = "Search this deck",
-                    onClick = { findQuery = if (findQuery.isBlank()) " " else "" }
+        Box(modifier = Modifier.fillMaxSize().padding(pagePadding)) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                SuiteCommandHeader(
+                    kind = ViewerKind.SLIDES,
+                    fileName = file?.name ?: "Presentation",
+                    subtitle = when (val state = deckState.value) {
+                        is DeckLoad.Loading -> "Reading slides…"
+                        is DeckLoad.Ready -> "${state.deck.slides.size} slides • ${activeSuite.badge}"
+                        is DeckLoad.Unsupported -> "Text outline unavailable"
+                        is DeckLoad.Failed -> "Could not open"
+                    },
+                    activeSuite = activeSuite,
+                    onSelectSuite = { viewModel.setPreferredSuiteStyle(it) },
+                    session = suiteSession,
+                    progress = if (slideCount > 0) (safeIndex + 1).toFloat() / slideCount else 0f,
+                    zoomPercent = (textScale * 100).toInt(),
+                    onBack = { viewModel.navigateBack() },
+                    onSearchToggle = { findQuery = if (findQuery.isBlank()) " " else "" },
+                    onOutlineToggle = { pane = if (pane == DeckPane.OUTLINE) DeckPane.NONE else DeckPane.OUTLINE },
+                    onShare = { viewModel.navigateTo(Screen.ShareScreen) },
+                    onExportPdf = { presenting = true },
+                    onPrint = { showGridSheet = true },
+                    onZoomChange = { delta -> textScale = (textScale + delta).coerceIn(0.75f, 1.6f) },
+                    onTextScaleChange = { delta -> textScale = (textScale + delta).coerceIn(0.75f, 1.6f) }
                 )
-                Spacer(Modifier.width(VennelaTokens.spaceXs))
-                ReaderIconButton(
-                    icon = Icons.AutoMirrored.Filled.FormatListBulleted,
-                    contentDescription = "Slide outline",
-                    active = pane == DeckPane.OUTLINE,
-                    onClick = { pane = if (pane == DeckPane.OUTLINE) DeckPane.NONE else DeckPane.OUTLINE }
-                )
-                Spacer(Modifier.width(VennelaTokens.spaceXs))
-                ReaderIconButton(
-                    icon = Icons.Default.Info,
-                    contentDescription = "Presentation details",
-                    active = pane == DeckPane.INFO,
-                    onClick = { pane = if (pane == DeckPane.INFO) DeckPane.NONE else DeckPane.INFO }
-                )
-            }
 
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    start = VennelaTokens.gutter,
-                    end = VennelaTokens.gutter,
-                    top = VennelaTokens.viewerTopInset + pagePadding.calculateTopPadding(),
-                    bottom = pagePadding.calculateBottomPadding() + 12.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(VennelaTokens.spaceMd)
-            ) {
-                when (val state = deckState.value) {
-                    is DeckLoad.Loading -> item(key = "loading") { SlideSkeleton() }
-
-                    is DeckLoad.Failed -> item(key = "failed") {
-                        MessageCard(
-                            title = "Could not open this presentation",
-                            body = state.message,
-                            actionLabel = "Try again",
-                            onAction = { file?.let { viewModel.openFile(it) } }
-                        )
+                val stageBackdrop = remember(activeSuite, suiteSession.paperTone, palette.isDark) {
+                    when (activeSuite) {
+                        ViewerSuiteStyle.GOOGLE_WORKSPACE -> if (palette.isDark) Color(0xFF1F2125) else Color(0xFFF1F3F4)
+                        ViewerSuiteStyle.MICROSOFT_365 -> if (palette.isDark) Color(0xFF1A1B1E) else Color(0xFFEDEBE9)
+                        ViewerSuiteStyle.WPS_SUPER -> if (suiteSession.paperTone == WpsPaperTone.EYE_CARE_GREEN) Color(0xFFDDF3E0) else Color(0xFFF2F4F7)
+                        ViewerSuiteStyle.LIBRE_OFFICE -> if (palette.isDark) Color(0xFF202225) else Color(0xFFDADCE0)
+                        ViewerSuiteStyle.OKEN_SCANNER -> Color(0xFF1E2229)
                     }
+                }
 
-                    is DeckLoad.Unsupported -> item(key = "unsupported") {
-                        MessageCard(
-                            title = "Layout preview unavailable",
-                            body = buildString {
-                                append("This .")
-                                append(state.extension.ifBlank { "unknown" })
-                                append(" file is a binary container, so its slides cannot be decomposed here. ")
-                                append("Vennela does not fake slide content. ")
-                                append("Legacy .ppt and Apple Keynote decks need PowerPoint or Keynote to render their layout.")
-                            },
-                            actionLabel = "Inspect as archive",
-                            onAction = { viewModel.navigateTo(Screen.ArchiveBrowser) }
-                        )
-                    }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .background(stageBackdrop),
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    LazyColumn(
+                        modifier = Modifier
+                            .widthIn(max = 860.dp)
+                            .fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            start = VennelaTokens.gutter,
+                            end = VennelaTokens.gutter,
+                            top = VennelaTokens.spaceMd,
+                            bottom = 24.dp
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(VennelaTokens.spaceMd)
+                    ) {
+                        when (val state = deckState.value) {
+                        is DeckLoad.Loading -> item(key = "loading") { SlideSkeleton() }
 
-                    is DeckLoad.Ready -> {
-                        val current = state.deck.slides.getOrNull(safeIndex)
-                        if (current != null) {
-                            item(key = "slide") {
-                                SlideCanvas(
-                                    slide = current,
-                                    total = state.deck.slides.size,
-                                    textScale = textScale,
-                                    highlight = findQuery.takeIf { it.isNotBlank() }
-                                )
-                            }
+                        is DeckLoad.Failed -> item(key = "failed") {
+                            MessageCard(
+                                title = "Could not open this presentation",
+                                body = state.message,
+                                actionLabel = "Try again",
+                                onAction = { file?.let { viewModel.openFile(it) } }
+                            )
+                        }
+
+                        is DeckLoad.Unsupported -> item(key = "unsupported") {
+                            MessageCard(
+                                title = "Layout preview unavailable",
+                                body = buildString {
+                                    append("This .")
+                                    append(state.extension.ifBlank { "unknown" })
+                                    append(" file is a binary container, so its slides cannot be decomposed here. ")
+                                    append("Vennela does not fake slide content. ")
+                                    append("Legacy .ppt and Apple Keynote decks need PowerPoint or Keynote to render their layout.")
+                                },
+                                actionLabel = "Inspect as archive",
+                                onAction = { viewModel.navigateTo(Screen.ArchiveBrowser) }
+                            )
+                        }
+
+                        is DeckLoad.Ready -> {
+                            val current = state.deck.slides.getOrNull(safeIndex)
+                            if (current != null) {
+                                item(key = "slide") {
+                                    var swipeDelta by remember { mutableFloatStateOf(0f) }
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .pointerInput(safeIndex, state.deck.slides.size) {
+                                                detectHorizontalDragGestures(
+                                                    onDragStart = { swipeDelta = 0f },
+                                                    onHorizontalDrag = { change, amount ->
+                                                        change.consume()
+                                                        swipeDelta += amount
+                                                    },
+                                                    onDragEnd = {
+                                                        val threshold = 64.dp.toPx()
+                                                        if (swipeDelta < -threshold && safeIndex < state.deck.slides.lastIndex) {
+                                                            index = safeIndex + 1
+                                                        } else if (swipeDelta > threshold && safeIndex > 0) {
+                                                            index = safeIndex - 1
+                                                        }
+                                                        swipeDelta = 0f
+                                                    }
+                                                )
+                                            }
+                                    ) {
+                                        AnimatedContent(
+                                            targetState = current,
+                                            transitionSpec = {
+                                                val forward = targetState.number >= initialState.number
+                                                (slideInHorizontally(LiquidMotion.liquid()) { if (forward) it / 4 else -it / 4 } +
+                                                    fadeIn(LiquidMotion.glide()))
+                                                    .togetherWith(
+                                                        slideOutHorizontally(LiquidMotion.glide()) { if (forward) -it / 5 else it / 5 } +
+                                                            fadeOut(LiquidMotion.exit())
+                                                    )
+                                            },
+                                            label = "deckSlideCanvasTransition"
+                                        ) { animatedSlide ->
+                                            SlideCanvas(
+                                                slide = animatedSlide,
+                                                total = state.deck.slides.size,
+                                                textScale = textScale,
+                                                highlight = findQuery.takeIf { it.isNotBlank() },
+                                                suite = activeSuite,
+                                                paperTone = suiteSession.paperTone
+                                            )
+                                        }
+                                    }
+                                }
 
                             item(key = "rail") {
                                 SlideRail(
@@ -338,6 +431,23 @@ fun PresentationViewerScreen(viewModel: MainViewModel) {
                     )
                 }
             }
+            }
+
+            SuiteFooterStatusBar(
+                suite = activeSuite,
+                pageOrLineLabel = if (slideCount == 0) "Slide 0 of 0" else "Slide ${safeIndex + 1} of $slideCount",
+                wordCount = currentSlide?.body?.sumOf { it.split(Regex("\\s+")).count { w -> w.isNotBlank() } } ?: 0,
+                charCount = currentSlide?.body?.sumOf { it.length } ?: 0,
+                zoomPercent = (textScale * 100).toInt(),
+                extraBadge = when (activeSuite) {
+                    ViewerSuiteStyle.GOOGLE_WORKSPACE -> "Google Slides 16:9"
+                    ViewerSuiteStyle.MICROSOFT_365 -> "PowerPoint Normal View"
+                    ViewerSuiteStyle.WPS_SUPER -> "WPS Presentation"
+                    ViewerSuiteStyle.LIBRE_OFFICE -> "Impress 16:9 Stage"
+                    ViewerSuiteStyle.OKEN_SCANNER -> "Oken HD Board"
+                }
+            )
+            }
 
             if (presenting && currentSlide != null) {
                 PresentationStage(
@@ -354,6 +464,92 @@ fun PresentationViewerScreen(viewModel: MainViewModel) {
             }
         }
     }
+
+    if (showGridSheet && deck != null && deck.slides.isNotEmpty()) {
+        ModalBottomSheet(
+            onDismissRequest = { showGridSheet = false },
+            containerColor = palette.cardSurfaceStrong,
+            contentColor = palette.textPrimary
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = VennelaTokens.spaceXl)
+                    .padding(bottom = VennelaTokens.spaceXxl)
+            ) {
+                Text(
+                    text = "Slide sorter • ${deck.slides.size} slides",
+                    color = palette.textPrimary,
+                    fontFamily = VennelaFonts.Sans,
+                    fontSize = VennelaTokens.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(VennelaTokens.spaceMd))
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = VennelaTokens.spaceHuge * 12),
+                    horizontalArrangement = Arrangement.spacedBy(VennelaTokens.spaceSm),
+                    verticalArrangement = Arrangement.spacedBy(VennelaTokens.spaceSm)
+                ) {
+                    itemsIndexed(deck.slides, key = { _, slide -> "grid_slide_${slide.number}" }) { pos, slide ->
+                        val active = pos == safeIndex
+                        GlassPanel(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(16f / 10f)
+                                .border(
+                                    width = if (active) 1.5.dp else 1.dp,
+                                    color = if (active) accent.secondary else palette.cardBorder,
+                                    shape = RoundedCornerShape(VennelaTokens.radiusCard)
+                                )
+                                .pressScale(0.97f) {
+                                    index = pos
+                                    showGridSheet = false
+                                },
+                            shape = RoundedCornerShape(VennelaTokens.radiusCard),
+                            alpha = if (active) 0.56f else 0.34f
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(VennelaTokens.spaceMd)
+                            ) {
+                                Text(
+                                    text = "Slide ${slide.number}",
+                                    color = if (active) accent.secondary else palette.textTertiary,
+                                    fontFamily = VennelaFonts.Mono,
+                                    fontSize = VennelaTokens.nano,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(VennelaTokens.spaceXs))
+                                Text(
+                                    text = slide.title,
+                                    color = palette.textPrimary,
+                                    fontFamily = VennelaFonts.Serif,
+                                    fontSize = VennelaTokens.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                if (slide.body.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(VennelaTokens.spaceXs))
+                                    Text(
+                                        text = slide.body.first(),
+                                        color = palette.textSecondary,
+                                        fontSize = VennelaTokens.micro,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /* ------------------------------------------------------------------------- */
@@ -365,47 +561,82 @@ private fun SlideCanvas(
     slide: Slide,
     total: Int,
     textScale: Float,
-    highlight: String?
+    highlight: String?,
+    suite: ViewerSuiteStyle = ViewerSuiteStyle.GOOGLE_WORKSPACE,
+    paperTone: WpsPaperTone = WpsPaperTone.CRISP_WHITE
 ) {
-    val palette = LocalVennelaPalette.current
-    val accent = LocalVennelaAccent.current
+    val brandAccent = ViewerKind.SLIDES.accentFor(suite)
+    val effectivePaper = when (suite) {
+        ViewerSuiteStyle.WPS_SUPER -> paperTone
+        else -> WpsPaperTone.CRISP_WHITE
+    }
+    val slidePaperColor = effectivePaper.paperColor
+    val slideInk = effectivePaper.inkColor
+    val slideMuted = effectivePaper.mutedInkColor
+    val cornerRadius = when (suite) {
+        ViewerSuiteStyle.GOOGLE_WORKSPACE -> 8.dp
+        ViewerSuiteStyle.MICROSOFT_365 -> 4.dp
+        ViewerSuiteStyle.WPS_SUPER -> 12.dp
+        ViewerSuiteStyle.LIBRE_OFFICE -> 2.dp
+        ViewerSuiteStyle.OKEN_SCANNER -> 6.dp
+    }
 
-    GlassPanel(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(16f / 9f),
-        shape = RoundedCornerShape(VennelaTokens.radiusSheet),
-        elevation = VennelaTokens.elevationRaised,
-        alpha = 0.30f
+            .aspectRatio(16f / 9f)
+            .shadow(
+                elevation = 10.dp,
+                shape = RoundedCornerShape(cornerRadius),
+                ambientColor = Color.Black.copy(alpha = 0.25f),
+                spotColor = Color.Black.copy(alpha = 0.30f)
+            )
+            .clip(RoundedCornerShape(cornerRadius))
+            .background(slidePaperColor)
+            .border(1.dp, brandAccent.copy(alpha = 0.35f), RoundedCornerShape(cornerRadius))
     ) {
+        // Authentic top/left slide master accent bar
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(brandAccent, brandAccent.copy(alpha = 0.65f))
+                    )
+                )
+        )
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 18.dp, vertical = 16.dp)
+                .padding(horizontal = 22.dp, vertical = 18.dp)
                 .verticalScroll(rememberScrollState())
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(VennelaTokens.spaceXxs + 4.dp)
-                        .clip(CircleShape)
-                        .background(accent.secondary)
-                )
-                Spacer(modifier = Modifier.width(VennelaTokens.spaceSm))
-                Text(
-                    text = "Slide ${slide.number} of $total",
-                    color = palette.textTertiary,
-                    fontSize = VennelaTokens.micro,
-                    fontWeight = FontWeight.Medium
-                )
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(brandAccent.copy(alpha = 0.14f))
+                        .padding(horizontal = 7.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "${ViewerKind.SLIDES.appNameFor(suite)} • Slide ${slide.number} / $total",
+                        color = brandAccent,
+                        fontFamily = VennelaFonts.Mono,
+                        fontSize = VennelaTokens.nano,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
             Spacer(modifier = Modifier.height(VennelaTokens.spaceSm))
             Text(
                 text = slide.title,
-                color = palette.textPrimary,
+                color = slideInk,
+                fontFamily = VennelaFonts.OnePlusDisplay,
                 fontSize = VennelaTokens.titleDisplay * textScale,
                 fontWeight = FontWeight.Bold,
-                lineHeight = VennelaTokens.titleDisplay * textScale * 1.2f,
+                lineHeight = VennelaTokens.titleDisplay * textScale * 1.18f,
                 maxLines = 4,
                 overflow = TextOverflow.Ellipsis
             )
@@ -413,10 +644,10 @@ private fun SlideCanvas(
                 Spacer(modifier = Modifier.height(VennelaTokens.spaceSm))
                 Box(
                     modifier = Modifier
-                        .width(VennelaTokens.spaceHuge)
-                        .height(2.dp)
+                        .width(56.dp)
+                        .height(3.dp)
                         .clip(RoundedCornerShape(VennelaTokens.radiusPill))
-                        .background(accent.primary.copy(alpha = 0.6f))
+                        .background(brandAccent)
                 )
             }
             Spacer(modifier = Modifier.height(VennelaTokens.spaceMd))
@@ -424,35 +655,37 @@ private fun SlideCanvas(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = VennelaTokens.spaceXxs),
+                        .padding(vertical = 3.dp),
                     verticalAlignment = Alignment.Top
                 ) {
                     Box(
                         modifier = Modifier
-                            .padding(top = VennelaTokens.spaceSm)
-                            .size(VennelaTokens.spaceXs)
+                            .padding(top = 7.dp)
+                            .size(6.dp)
                             .clip(CircleShape)
                             .background(
                                 if (highlight != null && line.contains(highlight, ignoreCase = true)) {
-                                    accent.secondary
+                                    brandAccent
                                 } else {
-                                    palette.textTertiary.copy(alpha = 0.7f)
+                                    brandAccent.copy(alpha = 0.72f)
                                 }
                             )
                     )
                     Spacer(modifier = Modifier.width(VennelaTokens.spaceMd))
                     Text(
                         text = line,
-                        color = palette.textSecondary,
+                        color = slideInk.copy(alpha = 0.88f),
+                        fontFamily = VennelaFonts.Sans,
                         fontSize = VennelaTokens.body * textScale,
-                        lineHeight = VennelaTokens.body * textScale * 1.45f
+                        lineHeight = VennelaTokens.body * textScale * 1.42f
                     )
                 }
             }
             if (slide.body.isEmpty()) {
                 Text(
                     text = "This slide has a title but no body text in the file.",
-                    color = palette.textTertiary,
+                    color = slideMuted,
+                    fontFamily = VennelaFonts.Sans,
                     fontSize = VennelaTokens.bodySmall
                 )
             }

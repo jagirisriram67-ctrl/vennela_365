@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -59,7 +60,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.vennela365.viewer.model.HexRow
@@ -70,6 +71,7 @@ import com.vennela365.viewer.theme.LocalVennelaPalette
 import com.vennela365.viewer.theme.LiquidMotion
 import com.vennela365.viewer.theme.NeonCyan
 import com.vennela365.viewer.theme.NeonMagenta
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.theme.applyViewerColorMode
 import com.vennela365.viewer.ui.components.GlassDivider
@@ -195,24 +197,29 @@ fun VennelaUniversalViewerScreen(viewModel: MainViewModel) {
                     ReaderIconButton(
                         icon = Icons.Default.ColorLens,
                         contentDescription = "Cycle colour mode",
+                        modifier = Modifier.testTag("universal_cycle_color_button"),
                         onClick = { viewModel.cycleViewerColorMode() }
                     )
                     Spacer(Modifier.width(VennelaTokens.spaceXs))
                     ReaderIconButton(
                         icon = Icons.Default.FolderOpen,
                         contentDescription = "Pick a file",
+                        modifier = Modifier.testTag("universal_pick_file_button"),
                         onClick = { pickAnyFile() }
                     )
                     Spacer(Modifier.width(VennelaTokens.spaceXs))
                     ReaderIconButton(
                         icon = Icons.Default.MoreVert,
                         contentDescription = "File details",
+                        modifier = Modifier.testTag("universal_info_button"),
                         onClick = { viewModel.navigateTo(Screen.FileMetadata) }
                     )
                 }
 
             Column(
                 modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .widthIn(max = 900.dp)
                     .fillMaxSize()
                     .padding(horizontal = VennelaTokens.gutter)
                     .padding(
@@ -405,6 +412,7 @@ private fun LensModeRail(
                 onClick = { onSelect(mode) },
                 modifier = Modifier
                     .heightIn(min = VennelaTokens.touchTargetMin)
+                    .testTag("universal_mode_${mode.name.lowercase()}")
                     .graphicsLayer {
                         scaleX = 1f + 0.03f * chipGlow
                         scaleY = 1f + 0.03f * chipGlow
@@ -539,7 +547,7 @@ private fun PreviewMode(
                 color = palette.textPrimary,
                 fontSize = VennelaTokens.bodySmall,
                 lineHeight = VennelaTokens.titleLarge,
-                fontFamily = if (monospace) FontFamily.Monospace else FontFamily.Default
+                fontFamily = if (monospace) VennelaFonts.Mono else VennelaFonts.Sans
             )
         }
     }
@@ -577,7 +585,7 @@ private fun HexMode(
                         color = accent.secondary,
                         fontSize = VennelaTokens.nano,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = VennelaFonts.Mono,
                         maxLines = 1,
                         modifier = Modifier.width(HexOffsetWidth)
                     )
@@ -585,7 +593,7 @@ private fun HexMode(
                         text = row.hexBytes,
                         color = palette.textPrimary,
                         fontSize = VennelaTokens.nano,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = VennelaFonts.Mono,
                         maxLines = 1,
                         modifier = Modifier.weight(1f)
                     )
@@ -593,7 +601,7 @@ private fun HexMode(
                         text = row.ascii,
                         color = palette.textSecondary,
                         fontSize = VennelaTokens.nano,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = VennelaFonts.Mono,
                         maxLines = 1,
                         modifier = Modifier.width(HexAsciiWidth)
                     )

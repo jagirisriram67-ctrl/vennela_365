@@ -70,6 +70,9 @@ import com.vennela365.viewer.theme.LiquidMotion
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
 import com.vennela365.viewer.theme.ThemeMode
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.platform.testTag
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.theme.ViewerColorMode
 import com.vennela365.viewer.theme.tinted
@@ -143,6 +146,7 @@ fun ThemeSelectionScreen(
         topBarActions = {
             ThemeModeCycleButton(
                 mode = themeMode,
+                modifier = Modifier.testTag("theme_mode_cycle_button"),
                 onCycle = {
                     val next = when (themeMode) {
                         ThemeMode.DARK -> ThemeMode.LIGHT
@@ -154,10 +158,16 @@ fun ThemeSelectionScreen(
             )
         }
     ) { pagePadding ->
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            state = gridState,
+        Box(
             modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.TopCenter
+        ) {
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = 160.dp),
+            state = gridState,
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = 960.dp),
             contentPadding = PaddingValues(
                 start = VennelaTokens.gutter,
                 end = VennelaTokens.gutter,
@@ -227,7 +237,9 @@ fun ThemeSelectionScreen(
                 ThemeTile(
                     theme = theme,
                     selected = activeTheme == theme,
-                    modifier = Modifier.staggeredEntrance(index),
+                    modifier = Modifier
+                        .testTag("theme_tile_${theme.id}")
+                        .staggeredEntrance(index),
                     onClick = { viewModel.setTheme(theme) }
                 )
             }
@@ -258,6 +270,7 @@ fun ThemeSelectionScreen(
                         }
                         Box(
                             modifier = Modifier
+                                .testTag("theme_reset_accent_button")
                                 .height(VennelaTokens.touchTargetMin)
                                 .clip(RoundedCornerShape(VennelaTokens.radiusPill))
                                 .background(palette.cardSurfaceStrong)
@@ -432,6 +445,7 @@ fun ThemeSelectionScreen(
 
             item(span = fullSpan, key = "footer") { Spacer(Modifier.height(VennelaTokens.spaceSm)) }
         }
+        }
     }
 }
 
@@ -440,11 +454,15 @@ fun ThemeSelectionScreen(
 /* ------------------------------------------------------------------------- */
 
 @Composable
-private fun ThemeModeCycleButton(mode: ThemeMode, onCycle: () -> Unit) {
+private fun ThemeModeCycleButton(
+    mode: ThemeMode,
+    modifier: Modifier = Modifier,
+    onCycle: () -> Unit
+) {
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(VennelaTokens.touchTargetMin)
             .clip(CircleShape)
             .background(accent.primary.copy(alpha = 0.24f))
@@ -485,17 +503,10 @@ private fun ThemeTile(
     val accent = LocalVennelaAccent.current
     val shape = RoundedCornerShape(VennelaTokens.radiusCard)
 
-    // Selection animates rather than snapping: the body brightens, the neon
-    // glow swells and the check badge springs in.
     val ringColor by animateColorAsState(
-        targetValue = if (selected) accent.secondary else palette.cardBorder.copy(alpha = 0.45f),
+        targetValue = if (selected) accent.primary else palette.cardBorder.copy(alpha = 0.45f),
         animationSpec = tween(LiquidMotion.durationFast),
         label = "themeTileRing"
-    )
-    val glowElevation by animateFloatAsState(
-        targetValue = if (selected) 26f else 0f,
-        animationSpec = LiquidMotion.hero(),
-        label = "themeTileGlow"
     )
     val badgeScale by animateFloatAsState(
         targetValue = if (selected) 1f else 0f,
@@ -507,19 +518,12 @@ private fun ThemeTile(
         modifier = modifier
             .fillMaxWidth()
             .pressScale(pressedScale = 0.96f, onClick = onClick)
-            .shadow(
-                elevation = glowElevation.dp,
-                shape = shape,
-                clip = false,
-                ambientColor = accent.secondary.copy(alpha = 0.55f),
-                spotColor = accent.primary.copy(alpha = 0.55f)
-            )
             .semantics {
                 contentDescription = "${theme.title} theme, ${theme.subtitle}" +
                     if (selected) ", currently selected" else ""
             }
     ) {
-        GlassCard(alpha = if (selected) 0.56f else 0.42f) {
+        GlassCard(alpha = if (selected) 0.64f else 0.50f) {
             // Signature gradient preview band: the theme's own accent pair.
             Box(
                 modifier = Modifier
@@ -573,20 +577,13 @@ private fun ThemeTile(
             }
         }
 
-        // White hairline ring + outer glow on the selected tile.
+        // Crisp accent hairline ring on the selected tile without dark shadow bleed.
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .shadow(
-                    elevation = glowElevation.dp,
-                    shape = shape,
-                    clip = false,
-                    ambientColor = accent.secondary.copy(alpha = 0.60f),
-                    spotColor = theme.primaryAccent.copy(alpha = 0.60f)
-                )
                 .clip(shape)
                 .border(
-                    width = if (selected) 1.5.dp else 1.dp,
+                    width = if (selected) 2.dp else 1.dp,
                     color = ringColor,
                     shape = shape
                 )
@@ -602,13 +599,6 @@ private fun ThemeTile(
                     scaleY = badgeScale
                     alpha = badgeScale
                 }
-                .shadow(
-                    elevation = 14.dp,
-                    shape = RoundedCornerShape(VennelaTokens.radiusChip),
-                    clip = false,
-                    ambientColor = theme.primaryAccent.copy(alpha = 0.60f),
-                    spotColor = theme.secondaryAccent.copy(alpha = 0.60f)
-                )
         ) {
             IconBadge(
                 icon = Icons.Default.Check,
@@ -895,6 +885,7 @@ private fun TierFact(label: String, value: String, modifier: Modifier = Modifier
         Text(
             text = value,
             color = accent.secondary,
+            fontFamily = VennelaFonts.Mono,
             fontSize = VennelaTokens.bodySmall,
             fontWeight = FontWeight.Bold,
             maxLines = 1
@@ -902,6 +893,7 @@ private fun TierFact(label: String, value: String, modifier: Modifier = Modifier
         Text(
             text = label,
             color = palette.textSecondary,
+            fontFamily = VennelaFonts.Sans,
             fontSize = VennelaTokens.nano,
             maxLines = 1
         )
@@ -918,32 +910,21 @@ private fun FidelityOptionCard(
     val accent = LocalVennelaAccent.current
     val shape = RoundedCornerShape(VennelaTokens.radiusCard)
     val ringColor by animateColorAsState(
-        targetValue = if (selected) accent.secondary else palette.cardBorder.copy(alpha = 0.40f),
+        targetValue = if (selected) accent.primary else palette.cardBorder.copy(alpha = 0.40f),
         animationSpec = tween(LiquidMotion.durationFast),
         label = "fidelityRing"
     )
-    val glowElevation by animateFloatAsState(
-        targetValue = if (selected) 18f else 0f,
-        animationSpec = LiquidMotion.hero(),
-        label = "fidelityGlow"
-    )
     Box(
         modifier = Modifier
+            .testTag("theme_fidelity_${pref.id}")
             .fillMaxWidth()
             .pressScale(pressedScale = 0.97f, onClick = onSelect)
-            .shadow(
-                elevation = glowElevation.dp,
-                shape = shape,
-                clip = false,
-                ambientColor = accent.primary.copy(alpha = 0.50f),
-                spotColor = accent.secondary.copy(alpha = 0.50f)
-            )
             .semantics {
                 contentDescription = "${pref.label} fidelity" +
                     if (selected) ", currently active" else ""
             }
     ) {
-        GlassCard(alpha = if (selected) 0.52f else 0.38f) {
+        GlassCard(alpha = if (selected) 0.62f else 0.48f) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = pref.label,
@@ -987,7 +968,7 @@ private fun FidelityOptionCard(
                 .matchParentSize()
                 .clip(shape)
                 .border(
-                    width = if (selected) 1.5.dp else 1.dp,
+                    width = if (selected) 2.dp else 1.dp,
                     color = ringColor,
                     shape = shape
                 )

@@ -96,6 +96,10 @@ import com.vennela365.viewer.storage.VolumeKind
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
 import com.vennela365.viewer.theme.LiquidMotion
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.platform.testTag
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.ui.components.FloatingDockNav
 import com.vennela365.viewer.ui.components.GlassCard
@@ -204,6 +208,7 @@ fun DeviceStorageScreen(viewModel: MainViewModel) {
                     icon = Icons.Default.ArrowUpward,
                     colors = listOf(accent.primary, accent.secondary),
                     contentDescription = "Go up one folder",
+                    modifier = Modifier.testTag("storage_up_button"),
                     onClick = { viewModel.deviceUp() }
                 )
             }
@@ -211,18 +216,27 @@ fun DeviceStorageScreen(viewModel: MainViewModel) {
                 icon = if (gridMode) Icons.AutoMirrored.Filled.ViewList else Icons.Default.GridView,
                 colors = listOf(accent.secondary, accent.primary),
                 contentDescription = if (gridMode) "Switch to list view" else "Switch to grid view",
+                modifier = Modifier.testTag("storage_view_toggle"),
                 onClick = { gridMode = !gridMode }
             )
             IconBadge(
                 icon = if (showHidden) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                 colors = listOf(accent.primary, accent.secondary),
                 contentDescription = if (showHidden) "Hide hidden files" else "Show hidden files",
+                modifier = Modifier.testTag("storage_hidden_toggle"),
                 onClick = { viewModel.toggleShowHiddenFiles() }
             )
         }
     ) { pagePadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.TopCenter
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .widthIn(max = 920.dp)
+            ) {
             // Pinned above the list so the field keeps focus and the IME
             // connection while results stream in beneath it. Inside a
             // LazyColumn the item can be recycled as results grow, which
@@ -451,6 +465,7 @@ fun DeviceStorageScreen(viewModel: MainViewModel) {
                     onDelete = { viewModel.deleteSelected() },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
+                        .widthIn(max = 720.dp)
                         .padding(
                             start = VennelaTokens.gutter,
                             end = VennelaTokens.gutter,
@@ -520,11 +535,14 @@ private fun DeviceSearchBar(
             TextField(
                 value = query,
                 onValueChange = onQueryChange,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("storage_search_field"),
                 placeholder = {
                     Text(
                         text = "Search every folder on this device",
                         color = palette.textTertiary,
+                        fontFamily = VennelaFonts.Sans,
                         fontSize = VennelaTokens.bodySmall
                     )
                 },
@@ -546,6 +564,7 @@ private fun DeviceSearchBar(
                     size = VennelaTokens.badgeSm,
                     radius = VennelaTokens.radiusChip,
                     contentDescription = "Clear search",
+                    modifier = Modifier.testTag("storage_clear_search_button"),
                     onClick = { onQueryChange("") }
                 )
             }
@@ -623,8 +642,18 @@ private fun GrantBanner(onGrant: () -> Unit, onRefresh: () -> Unit) {
         }
         Spacer(modifier = Modifier.height(VennelaTokens.spaceMd))
         Row(horizontalArrangement = Arrangement.spacedBy(VennelaTokens.spaceSm)) {
-            LiquidButton(label = "Grant access", icon = Icons.Default.LockOpen, onClick = onGrant)
-            LiquidButton(label = "Re-check", icon = Icons.Default.Refresh, onClick = onRefresh)
+            LiquidButton(
+                label = "Grant access",
+                icon = Icons.Default.LockOpen,
+                modifier = Modifier.testTag("storage_grant_access_button"),
+                onClick = onGrant
+            )
+            LiquidButton(
+                label = "Re-check",
+                icon = Icons.Default.Refresh,
+                modifier = Modifier.testTag("storage_recheck_button"),
+                onClick = onRefresh
+            )
         }
     }
 }
@@ -703,6 +732,7 @@ private fun VolumeCard(volume: StorageVolumeInfo, onOpen: () -> Unit) {
                 Text(
                     text = "${(fraction.value * 100f).toInt()}% used",
                     color = accent.secondary,
+                    fontFamily = VennelaFonts.Mono,
                     fontSize = VennelaTokens.caption,
                     fontWeight = FontWeight.Bold
                 )
@@ -753,12 +783,14 @@ private fun VolumeCard(volume: StorageVolumeInfo, onOpen: () -> Unit) {
                 Text(
                     text = formatFileBytes(volume.usedBytes) + " used",
                     color = palette.textSecondary,
+                    fontFamily = VennelaFonts.Mono,
                     fontSize = VennelaTokens.caption,
                     fontWeight = FontWeight.Medium
                 )
                 Text(
                     text = formatFileBytes(volume.freeBytes) + " free",
                     color = palette.textSecondary,
+                    fontFamily = VennelaFonts.Mono,
                     fontSize = VennelaTokens.caption,
                     fontWeight = FontWeight.Medium
                 )
@@ -903,6 +935,7 @@ private fun ToolsBar(
                     size = VennelaTokens.badgeSm,
                     radius = VennelaTokens.radiusChip,
                     contentDescription = "Change sort order",
+                    modifier = Modifier.testTag("storage_sort_toggle"),
                     onClick = { sortOpen = !sortOpen }
                 )
             }
@@ -1031,28 +1064,31 @@ private fun FileGrid(
     viewModel: MainViewModel
 ) {
     val cellHeight = 148.dp
-    val rows = (sorted.size + 2) / 3
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(cellHeight * rows.coerceAtLeast(1)),
-        horizontalArrangement = Arrangement.spacedBy(VennelaTokens.spaceSm),
-        verticalArrangement = Arrangement.spacedBy(VennelaTokens.spaceSm),
-        userScrollEnabled = false
-    ) {
-        itemsIndexed(sorted, key = { _, item -> item.id }) { index, file ->
-            val isSelected = file.id in selected
-            Box(modifier = Modifier.staggeredEntrance(index)) {
-                FileGridCard(
-                    file = file,
-                    isSelected = isSelected,
-                    onClick = {
-                        if (selected.isNotEmpty()) viewModel.toggleSelection(file.id)
-                        else viewModel.openDeviceFile(file)
-                    },
-                    onLongClick = { viewModel.toggleSelection(file.id) }
-                )
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val columnCount = (maxWidth / 118.dp).toInt().coerceIn(3, 6)
+        val rows = (sorted.size + columnCount - 1) / columnCount
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(columnCount),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(cellHeight * rows.coerceAtLeast(1) + VennelaTokens.spaceSm * (rows - 1).coerceAtLeast(0)),
+            horizontalArrangement = Arrangement.spacedBy(VennelaTokens.spaceSm),
+            verticalArrangement = Arrangement.spacedBy(VennelaTokens.spaceSm),
+            userScrollEnabled = false
+        ) {
+            itemsIndexed(sorted, key = { _, item -> item.id }) { index, file ->
+                val isSelected = file.id in selected
+                Box(modifier = Modifier.staggeredEntrance(index)) {
+                    FileGridCard(
+                        file = file,
+                        isSelected = isSelected,
+                        onClick = {
+                            if (selected.isNotEmpty()) viewModel.toggleSelection(file.id)
+                            else viewModel.openDeviceFile(file)
+                        },
+                        onLongClick = { viewModel.toggleSelection(file.id) }
+                    )
+                }
             }
         }
     }
@@ -1189,12 +1225,14 @@ private fun SelectionBar(
                 icon = Icons.Default.Delete,
                 colors = listOf(palette.textSecondary, palette.textTertiary),
                 contentDescription = "Delete selected items",
+                modifier = Modifier.testTag("storage_selection_delete"),
                 onClick = onDelete
             )
             IconBadge(
                 icon = Icons.Default.Close,
                 colors = listOf(accent.primary, accent.secondary),
                 contentDescription = "Clear selection",
+                modifier = Modifier.testTag("storage_selection_clear"),
                 onClick = onClear
             )
         }

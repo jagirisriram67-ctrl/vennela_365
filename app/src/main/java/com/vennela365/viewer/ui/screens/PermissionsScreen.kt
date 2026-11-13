@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -61,6 +62,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -69,6 +71,7 @@ import androidx.core.content.ContextCompat
 import com.vennela365.viewer.theme.LiquidMotion
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.ui.components.GlassDivider
 import com.vennela365.viewer.ui.components.GlassListRow
@@ -207,8 +210,11 @@ fun PermissionsScreen(
         title = "Storage access",
         subtitle = subtitle
     ) { pagePadding ->
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = 760.dp),
             contentPadding = PaddingValues(
                 start = VennelaTokens.gutter,
                 end = VennelaTokens.gutter,
@@ -261,6 +267,7 @@ fun PermissionsScreen(
                             Text(
                                 text = "Open the files you choose",
                                 color = palette.textPrimary,
+                                fontFamily = VennelaFonts.Sans,
                                 fontSize = VennelaTokens.titleDisplay,
                                 fontWeight = FontWeight.Bold,
                                 textAlign = TextAlign.Center
@@ -269,6 +276,7 @@ fun PermissionsScreen(
                             Text(
                                 text = "Vennela 365 reads only what you pick. Nothing is uploaded, nothing is edited, and nothing leaves this device.",
                                 color = palette.textSecondary,
+                                fontFamily = VennelaFonts.Sans,
                                 fontSize = VennelaTokens.bodySmall,
                                 textAlign = TextAlign.Center
                             )
@@ -282,11 +290,14 @@ fun PermissionsScreen(
                             contentPadding = PaddingValues(vertical = VennelaTokens.spaceXs)
                         ) {
                             itemsIndexed(items = current.permissions, key = { _, permission -> permission }) { _, permission ->
+                                val tagSuffix = permission.substringAfterLast('.').lowercase()
                                 LiquidChip(
                                     text = permissionLabel(permission),
                                     icon = Icons.Default.FolderOpen,
                                     isActive = true,
-                                    modifier = Modifier.heightIn(min = VennelaTokens.touchTargetMin),
+                                    modifier = Modifier
+                                        .heightIn(min = VennelaTokens.touchTargetMin)
+                                        .testTag("permissions_chip_$tagSuffix"),
                                     onClick = { requestAccess() }
                                 )
                             }
@@ -346,12 +357,14 @@ fun PermissionsScreen(
                                 LiquidButton(
                                     label = "Grant access",
                                     icon = Icons.Default.Shield,
+                                    modifier = Modifier.testTag("permissions_grant_button"),
                                     onClick = { requestAccess() }
                                 )
                             }
                             Spacer(modifier = Modifier.height(VennelaTokens.spaceSm))
                             QuietPillAction(
                                 label = "Not now",
+                                modifier = Modifier.testTag("permissions_not_now_button"),
                                 onClick = { viewModel.navigateTo(Screen.Home) }
                             )
                         }
@@ -382,6 +395,7 @@ fun PermissionsScreen(
                                 Text(
                                     text = "Access granted",
                                     color = palette.textPrimary,
+                                    fontFamily = VennelaFonts.Sans,
                                     fontSize = VennelaTokens.titleLarge,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -389,6 +403,7 @@ fun PermissionsScreen(
                                 Text(
                                     text = "Vennela 365 can now read the files you choose, and nothing else.",
                                     color = palette.textSecondary,
+                                    fontFamily = VennelaFonts.Sans,
                                     fontSize = VennelaTokens.bodySmall,
                                     textAlign = TextAlign.Center
                                 )
@@ -433,17 +448,20 @@ fun PermissionsScreen(
                             LiquidButton(
                                 label = "Continue to library",
                                 icon = Icons.Default.FolderOpen,
+                                modifier = Modifier.testTag("permissions_continue_button"),
                                 onClick = { viewModel.navigateTo(Screen.Home) }
                             )
                             Spacer(modifier = Modifier.height(VennelaTokens.spaceSm))
                             QuietPillAction(
                                 label = "Review in system settings",
+                                modifier = Modifier.testTag("permissions_settings_button"),
                                 onClick = { openSystemSettings() }
                             )
                         }
                     }
                 }
             }
+        }
         }
     }
 }
@@ -457,7 +475,11 @@ fun PermissionsScreen(
  * edge, so it reads as a real control next to the glowing primary CTA.
  */
 @Composable
-private fun QuietPillAction(label: String, onClick: () -> Unit) {
+private fun QuietPillAction(
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
     val shape = RoundedCornerShape(VennelaTokens.radiusPill)
@@ -467,7 +489,7 @@ private fun QuietPillAction(label: String, onClick: () -> Unit) {
         label = "quietPillBorder"
     )
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .heightIn(min = VennelaTokens.touchTargetMin)
             .clip(shape)
@@ -488,6 +510,7 @@ private fun QuietPillAction(label: String, onClick: () -> Unit) {
         Text(
             text = label,
             color = palette.textSecondary,
+            fontFamily = VennelaFonts.Sans,
             fontSize = VennelaTokens.bodySmall,
             fontWeight = FontWeight.Medium
         )

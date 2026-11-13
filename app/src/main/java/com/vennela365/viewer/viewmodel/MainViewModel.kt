@@ -37,9 +37,11 @@ import com.vennela365.viewer.theme.AccentOption
 import com.vennela365.viewer.theme.AppTheme
 import com.vennela365.viewer.theme.ThemeMode
 import com.vennela365.viewer.theme.ViewerColorMode
+import com.vennela365.viewer.theme.AppFontStyle
 import com.vennela365.viewer.theme.FidelityGovernor
 import com.vennela365.viewer.theme.FidelityPreference
 import com.vennela365.viewer.theme.FidelityTier
+import com.vennela365.viewer.ui.components.ViewerSuiteStyle
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
@@ -55,6 +57,8 @@ private val KEY_ACCENT = stringPreferencesKey("accent_id")
 private val KEY_FAVS = stringPreferencesKey("favorites_csv")
 private val KEY_OFFLINE = booleanPreferencesKey("offline_mode")
 private val KEY_BROWSE_ROOT = stringPreferencesKey("browse_root_uri")
+private val KEY_SUITE_STYLE = stringPreferencesKey("viewer_suite_style")
+private val KEY_FONT_STYLE = stringPreferencesKey("app_font_style")
 
 enum class SortMode { NAME_ASC, NAME_DESC, DATE_NEWEST, DATE_OLDEST, SIZE_LARGEST, SIZE_SMALLEST, TYPE }
 
@@ -160,6 +164,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _accent = MutableStateFlow<AccentOption?>(null)
     val accent = _accent.asStateFlow()
+
+    private val _preferredSuiteStyle = MutableStateFlow(ViewerSuiteStyle.GOOGLE_WORKSPACE)
+    val preferredSuiteStyle = _preferredSuiteStyle.asStateFlow()
+
+    private val _appFontStyle = MutableStateFlow(AppFontStyle.ONEPLUS_SANS)
+    val appFontStyle = _appFontStyle.asStateFlow()
 
     private val _offlineMode = MutableStateFlow(true)
     val offlineMode = _offlineMode.asStateFlow()
@@ -462,10 +472,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setTheme(theme: AppTheme) {
         _activeTheme.value = theme
+        val syncedMode = if (theme.isDark) ThemeMode.DARK else ThemeMode.LIGHT
+        _themeMode.value = syncedMode
         viewModelScope.launch {
             try {
                 getApplication<Application>().applicationContext.vennelaDataStore.edit { prefs ->
                     prefs[KEY_THEME] = theme.name
+                    prefs[KEY_THEME_MODE] = syncedMode.id
                 }
             } catch (_: Exception) { }
         }
@@ -516,6 +529,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun setPreferredSuiteStyle(style: ViewerSuiteStyle) {
+        _preferredSuiteStyle.value = style
+        viewModelScope.launch {
+            try {
+                getApplication<Application>().applicationContext.vennelaDataStore.edit { prefs ->
+                    prefs[KEY_SUITE_STYLE] = style.id
+                }
+            } catch (_: Exception) { }
+        }
+    }
+
+    fun setAppFontStyle(style: AppFontStyle) {
+        _appFontStyle.value = style
+        viewModelScope.launch {
+            try {
+                getApplication<Application>().applicationContext.vennelaDataStore.edit { prefs ->
+                    prefs[KEY_FONT_STYLE] = style.id
+                }
+            } catch (_: Exception) { }
+        }
+    }
+
     private fun restorePreferences() {
         viewModelScope.launch {
             try {
@@ -526,6 +561,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 _themeMode.value = ThemeMode.fromId(prefs[KEY_THEME_MODE])
                 _accent.value = AccentOption.entries.firstOrNull { it.id == prefs[KEY_ACCENT] }
+                _preferredSuiteStyle.value = ViewerSuiteStyle.fromId(prefs[KEY_SUITE_STYLE])
+                _appFontStyle.value = AppFontStyle.fromId(prefs[KEY_FONT_STYLE])
                 _offlineMode.value = prefs[KEY_OFFLINE] ?: true
                 val favCsv = prefs[KEY_FAVS].orEmpty()
                 if (favCsv.isNotBlank()) {
@@ -996,6 +1033,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var activeParseJob: Job? = null
     private var activeHexJob: Job? = null
 
+    fun selectFile(file: FileItem) {
+        _selectedFile.value = file
+    }
+
     fun openFile(file: FileItem) {
         // Cancel active background jobs to prevent race conditions during rapid file switching
         activeHexJob?.cancel()
@@ -1053,25 +1094,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
             } else if (file.uri != null) {
-                when (file.formatInfo.category) {
-                    FormatCategory.CODE, FormatCategory.CONFIG,
-                    FormatCategory.MARKDOWN, FormatCategory.LOGS -> {
+                val extLower = file.extension.lowercase().removePrefix(".")
+                val isTextBackedViewer = extLower in setOf(
+                    "svg", "svgz", "srt", "vtt", "webvtt", "ass", "ssa", "lrc",
+                    "m3u", "m3u8", "pls", "obj", "stl", "gpx", "kml",
+                    "geojson", "topojson", "ipynb", "rmd", "qmd",
+                    "gdoc", "gsheet", "gslides", "gdraw", "gform", "gsite", "gshortcut",
+                    "properties", "env", "dotenv", "cfg", "conf", "editorconfig"
+                )
+                when {
+                    isTextBackedViewer || file.formatInfo.category in setOf(
+                        FormatCategory.CODE, FormatCategory.CONFIG,
+                        FormatCategory.MARKDOWN, FormatCategory.LOGS
+                    ) -> {
                         if (file.sampleContent.isBlank()) {
-                            val text = DocumentTextExtractor.readPlainText(ctx, file.uri)
+                            val text = DocumentTextExtractor.readPlainText(ctx, file.uri, extLower)
                             if (text.isNotBlank() && _selectedFile.value?.id == file.id) {
+                                _documentText.value = text
                                 _selectedFile.value = _selectedFile.value?.copy(sampleContent = text)
                             }
+                        } else if (_selectedFile.value?.id == file.id) {
+                            _documentText.value = file.sampleContent
                         }
                     }
-                    FormatCategory.SPREADSHEETS -> {
+                    file.formatInfo.category == FormatCategory.SPREADSHEETS -> {
                         val sheets = SpreadsheetParser.parseSpreadsheet(ctx, file.uri, file.extension)
                         if (_selectedFile.value?.id == file.id) _spreadsheetSheets.value = sheets
                     }
-                    FormatCategory.ARCHIVES -> {
+                    file.formatInfo.category == FormatCategory.ARCHIVES -> {
                         val entries = ArchiveParser.parseArchiveEntries(ctx, file.uri, file.extension)
                         if (_selectedFile.value?.id == file.id) _archiveEntries.value = entries
                     }
-                    FormatCategory.DOCUMENTS, FormatCategory.EMAIL_CONTACTS, FormatCategory.EBOOKS -> {
+                    file.formatInfo.category in setOf(
+                        FormatCategory.DOCUMENTS, FormatCategory.EMAIL_CONTACTS, FormatCategory.EBOOKS
+                    ) -> {
                         val extracted = DocumentTextExtractor.extract(ctx, file.uri, file.extension)
                         if (_selectedFile.value?.id == file.id) {
                             _documentText.value = extracted.text
@@ -1095,26 +1151,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             "ppt", "pptx", "pptm", "ppsm", "ppsx", "pps", "potx", "potm", "pot",
             "odp", "otp", "fodp", "key", "keynote", "show", "shw", "sxi" ->
                 navigateTo(Screen.PresentationViewer)
-            "xlsx", "xls", "xlsm", "xlsb", "xlt", "xltx", "ods", "ots", "dbf", "numbers", "gnumeric" -> navigateTo(Screen.SpreadsheetViewer)
-            "csv", "tsv", "dsv", "tab" -> navigateTo(Screen.CsvTable)
+            "xlsx", "xls", "xlsm", "xlsb", "xlt", "xltx", "ods", "ots", "dbf", "numbers", "gnumeric",
+            "csv", "tsv", "dsv", "tab" -> navigateTo(Screen.SpreadsheetViewer)
             "py", "java", "kt", "kts", "js", "mjs", "cjs", "jsx", "ts", "tsx", "cpp", "c", "h", "hpp", "cs", "html", "css", "scss", "sh", "bash", "zsh", "ps1", "sql", "go", "rs", "swift", "dart", "rb", "php", "lua", "r", "jl", "vue", "svelte", "astro" -> navigateTo(Screen.CodeViewer)
-            "json", "jsonc", "json5", "ndjson", "jsonl", "xml", "yaml", "yml", "toml", "ini", "proto", "graphql" -> navigateTo(Screen.StructuredData)
+            "json", "jsonc", "json5", "ndjson", "jsonl", "xml", "xsd", "xsl", "yaml", "yml", "toml", "ini", "cfg", "conf", "env", "dotenv", "properties", "editorconfig", "proto", "graphql",
+            "gdoc", "gsheet", "gslides", "gdraw", "gform", "gsite", "gshortcut" -> navigateTo(Screen.StructuredData)
             "md", "markdown", "mdown", "mkd", "rst", "adoc", "asciidoc", "org", "tex", "bib" -> navigateTo(Screen.MarkdownViewer)
             "mmd", "mermaid", "puml", "plantuml", "dot", "gv" -> navigateTo(Screen.MermaidViewer)
             "drawio", "bpmn", "opml" -> navigateTo(Screen.DiagramFallback)
             "ipynb", "rmd", "qmd" -> navigateTo(Screen.NotebookViewer)
             "mp3", "m4a", "m4b", "aac", "wav", "wave", "flac", "ogg", "oga", "opus", "aiff", "amr", "mid", "midi", "wma", "alac" -> navigateTo(Screen.AudioPlayer)
             "mp4", "m4v", "mov", "qt", "mkv", "webm", "avi", "wmv", "mpg", "mpeg", "3gp", "ogv", "ts", "m2ts" -> navigateTo(Screen.VideoPlayer)
-            "m3u", "m3u8", "pls", "srt", "vtt", "ass", "lrc" -> navigateTo(Screen.TrackInfo)
+            "m3u", "m3u8", "pls", "srt", "vtt", "webvtt", "ass", "ssa", "lrc" -> navigateTo(Screen.TrackInfo)
             "zip", "zipx", "jar", "apk", "aab", "tar", "tgz", "gz", "7z", "rar", "xz", "zst", "bz2", "cab" -> navigateTo(Screen.ArchiveBrowser)
             "tar.gz", "tar.xz", "tar.zst" -> navigateTo(Screen.NestedArchive)
             "ttf", "otf", "ttc", "woff", "woff2", "eot" -> navigateTo(Screen.FontViewer)
             "eml", "msg", "mbox", "pst", "ics", "vcf" -> navigateTo(Screen.EmailViewer)
             "db", "sqlite", "sqlite3", "mdb", "accdb", "realm", "parquet" -> navigateTo(Screen.DatabaseViewer)
-            "h5", "hdf5", "nc", "npy", "npz", "fits", "mat", "cif", "mol", "xyz" -> navigateTo(Screen.ScientificViewer)
+            "h5", "hdf5", "nc", "npy", "npz", "fits", "mat", "cif", "mol" -> navigateTo(Screen.ScientificViewer)
             "pt", "pth", "onnx", "tflite", "pkl", "safetensors", "ckpt" -> navigateTo(Screen.ModelInspector)
             "stl", "obj", "fbx", "gltf", "glb", "step", "stp", "iges", "dwg", "dxf", "blend", "usd", "usdz" -> navigateTo(Screen.CadViewer)
-            "shp", "gpkg", "gpx", "kml", "kmz", "geojson", "tif" -> navigateTo(Screen.GisViewer)
+            "shp", "gpkg", "gpx", "kml", "kmz", "geojson", "topojson" -> navigateTo(Screen.GisViewer)
             "exe", "dll", "so", "dylib", "elf", "bin", "dex", "msi", "class", "pyc" -> navigateTo(Screen.ExecutableInspector)
             "log", "out", "err", "trace", "pcap", "har", "hprof", "evtx" -> navigateTo(Screen.CodeViewer)
             "epub", "mobi", "azw", "azw3", "fb2", "cbz", "cbr" -> navigateTo(Screen.OpenDocument)
@@ -1150,12 +1207,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val name = metadata?.first ?: displayName ?: uri.lastPathSegment ?: "opened_file"
                 val key = FileNameResolver.resolveKey(name)
                 val info = FormatRegistry.lookup(key)
-                val preview = if (info.category in setOf(FormatCategory.CODE, FormatCategory.CONFIG, FormatCategory.MARKDOWN, FormatCategory.LOGS)) {
-                    runCatching {
-                        context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { reader ->
-                            reader.readText().take(512 * 1024)
-                        }.orEmpty()
-                    }.getOrDefault("")
+                val isTextBackedViewer = key.lowercase() in setOf(
+                    "svg", "svgz", "srt", "vtt", "webvtt", "ass", "ssa", "lrc",
+                    "m3u", "m3u8", "pls", "obj", "stl", "gpx", "kml",
+                    "geojson", "topojson", "ipynb", "rmd", "qmd",
+                    "gdoc", "gsheet", "gslides", "gdraw", "gform", "gsite", "gshortcut",
+                    "properties", "env", "dotenv", "cfg", "conf", "editorconfig"
+                )
+                val preview = if (isTextBackedViewer || info.category in setOf(
+                        FormatCategory.CODE, FormatCategory.CONFIG, FormatCategory.MARKDOWN, FormatCategory.LOGS
+                    )
+                ) {
+                    DocumentTextExtractor.readPlainText(context, uri, key)
                 } else ""
                 FileItem(
                     id = uri.toString(),

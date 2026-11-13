@@ -51,6 +51,7 @@ class MainActivity : ComponentActivity() {
             val activeTheme by viewModel.activeTheme.collectAsState()
             val themeMode by viewModel.themeMode.collectAsState()
             val accent by viewModel.accent.collectAsState()
+            val appFontStyle by viewModel.appFontStyle.collectAsState()
             val currentScreen by viewModel.currentScreen.collectAsState()
 
             // System Back navigation
@@ -63,7 +64,8 @@ class MainActivity : ComponentActivity() {
             VennelaTheme(
                 activeTheme = activeTheme,
                 themeMode = themeMode,
-                accent = accent
+                accent = accent,
+                fontStyle = appFontStyle
             ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),

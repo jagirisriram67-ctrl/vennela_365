@@ -60,7 +60,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -73,6 +73,7 @@ import com.vennela365.viewer.storage.ShareUri
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
 import com.vennela365.viewer.theme.VennelaAccent
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaPalette
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.theme.liquidGlass
@@ -681,6 +682,7 @@ fun MermaidViewerScreen(viewModel: MainViewModel) {
                     ReaderIconButton(
                         icon = if (showCode) Icons.Default.AccountTree else Icons.Default.Code,
                         contentDescription = if (showCode) "Show the diagram" else "Show the source",
+                        modifier = Modifier.testTag("mermaid_source_button"),
                         active = showCode,
                         onClick = {
                             showCode = !showCode
@@ -693,16 +695,19 @@ fun MermaidViewerScreen(viewModel: MainViewModel) {
                         ReaderIconButton(
                             icon = Icons.Default.ZoomOut,
                             contentDescription = "Zoom out",
+                            modifier = Modifier.testTag("mermaid_zoom_out_button"),
                             onClick = { zoomBy(-ZoomStep) }
                         )
                         ReaderIconButton(
                             icon = Icons.Default.ZoomIn,
                             contentDescription = "Zoom in",
+                            modifier = Modifier.testTag("mermaid_zoom_in_button"),
                             onClick = { zoomBy(ZoomStep) }
                         )
                         ReaderIconButton(
                             icon = Icons.Default.AspectRatio,
                             contentDescription = "Fit diagram to width",
+                            modifier = Modifier.testTag("mermaid_fit_width_button"),
                             active = zoom <= fitScale(useWidth = true) + 0.001f,
                             onClick = {
                                 zoom = fitScale(useWidth = true)
@@ -712,6 +717,7 @@ fun MermaidViewerScreen(viewModel: MainViewModel) {
                         ReaderIconButton(
                             icon = Icons.Default.SwapVert,
                             contentDescription = "Fit diagram to height",
+                            modifier = Modifier.testTag("mermaid_fit_height_button"),
                             onClick = {
                                 zoom = fitScale(useWidth = false)
                                 chromeVisible = true
@@ -720,6 +726,7 @@ fun MermaidViewerScreen(viewModel: MainViewModel) {
                         ReaderIconButton(
                             icon = Icons.Default.FitScreen,
                             contentDescription = "Reset zoom to 100%",
+                            modifier = Modifier.testTag("mermaid_reset_zoom_button"),
                             onClick = {
                                 zoom = 1f
                                 chromeVisible = true
@@ -774,6 +781,7 @@ private fun MermaidSourceSurface(
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
         contentPadding = PaddingValues(
             start = VennelaTokens.gutter,
             end = VennelaTokens.gutter,
@@ -785,6 +793,7 @@ private fun MermaidSourceSurface(
         item(key = "mermaid_source_head") {
             Row(
                 modifier = Modifier
+                    .widthIn(max = 860.dp)
                     .fillMaxWidth()
                     .padding(bottom = VennelaTokens.spaceXs),
                 verticalAlignment = Alignment.CenterVertically
@@ -809,6 +818,7 @@ private fun MermaidSourceSurface(
                 Text(
                     text = "$totalLines lines",
                     color = palette.textTertiary,
+                    fontFamily = VennelaFonts.Mono,
                     fontSize = VennelaTokens.nano,
                     maxLines = 1
                 )
@@ -816,12 +826,17 @@ private fun MermaidSourceSurface(
         }
 
         items(count = lines.size, key = { index -> index }) { index ->
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+            Row(
+                modifier = Modifier
+                    .widthIn(max = 860.dp)
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.Top
+            ) {
                 Text(
                     text = "${index + 1}",
                     color = palette.textTertiary,
                     fontSize = VennelaTokens.micro,
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = VennelaFonts.Mono,
                     lineHeight = lineHeight,
                     maxLines = 1,
                     modifier = Modifier
@@ -832,10 +847,10 @@ private fun MermaidSourceSurface(
                     text = lines[index],
                     color = palette.textPrimary,
                     fontSize = VennelaTokens.caption,
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = VennelaFonts.Mono,
                     lineHeight = lineHeight,
                     softWrap = true,
-                    modifier = Modifier.widthIn(max = 680.dp)
+                    modifier = Modifier.widthIn(max = 760.dp)
                 )
             }
         }

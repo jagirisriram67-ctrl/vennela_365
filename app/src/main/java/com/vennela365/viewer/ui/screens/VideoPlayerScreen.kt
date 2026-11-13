@@ -56,6 +56,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -76,6 +77,7 @@ import com.vennela365.viewer.storage.ShareUri
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
 import com.vennela365.viewer.theme.LiquidMotion
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.theme.liquidGlass
 import com.vennela365.viewer.theme.liquidGlassSpec
@@ -574,6 +576,7 @@ fun VideoPlayerScreen(viewModel: MainViewModel) {
                 icon = if (controlsLocked) Icons.Default.Lock else Icons.Default.LockOpen,
                 contentDescription = if (controlsLocked) "Unlock controls" else "Lock controls",
                 selected = controlsLocked,
+                modifier = Modifier.testTag("video_lock_button"),
                 onClick = {
                     controlsLocked = !controlsLocked
                     if (!controlsLocked) interactionTick += 1
@@ -726,13 +729,21 @@ private fun TopChrome(
     var menuOpen by remember { mutableStateOf(false) }
     val spec = liquidGlassSpec(alpha = 0.40f, frost = VennelaTokens.frostRegular, elevation = VennelaTokens.elevationBar)
     Row(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .statusBarsPadding()
+            .widthIn(max = 960.dp)
+            .fillMaxWidth()
             .padding(horizontal = VennelaTokens.gutter, vertical = VennelaTokens.spaceMd)
             .liquidGlass(spec, RoundedCornerShape(VennelaTokens.radiusCardLarge))
             .padding(horizontal = VennelaTokens.spaceSm, vertical = VennelaTokens.spaceSm),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        GlassIconCircle(Icons.AutoMirrored.Filled.ArrowBack, "Back", onBack)
+        GlassIconCircle(
+            icon = Icons.AutoMirrored.Filled.ArrowBack,
+            contentDescription = "Back",
+            modifier = Modifier.testTag("video_back_button"),
+            onClick = onBack
+        )
         Spacer(modifier = Modifier.width(VennelaTokens.spaceMd))
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -749,6 +760,7 @@ private fun TopChrome(
             icon = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
             contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
             selected = isFavorite,
+            modifier = Modifier.testTag("video_favorite_button"),
             onClick = onToggleFavorite
         )
         Spacer(modifier = Modifier.width(VennelaTokens.spaceXs))
@@ -785,6 +797,7 @@ private fun CenterPlayButton(isPlaying: Boolean, onClick: () -> Unit) {
     )
     Box(
         modifier = Modifier.size(84.dp)
+            .testTag("video_center_play_button")
             .graphicsLayer {
                 scaleX = pulse
                 scaleY = pulse
@@ -824,6 +837,7 @@ private fun GlassIconCircle(
     icon: ImageVector,
     contentDescription: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
     selected: Boolean = false,
     tint: Color? = null
 ) {
@@ -831,7 +845,7 @@ private fun GlassIconCircle(
     val accent = LocalVennelaAccent.current
     val resolved = tint ?: if (selected) Color.White else palette.textPrimary
     Box(
-        modifier = Modifier.size(VennelaTokens.touchTargetMin)
+        modifier = modifier.size(VennelaTokens.touchTargetMin)
             .clip(CircleShape)
             .background(
                 if (selected) {
@@ -994,7 +1008,10 @@ private fun BottomControls(
     val shownPosition = scrubOverride?.let { (it * durationMs).toLong() } ?: positionMs
 
     Column(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .navigationBarsPadding()
+            .widthIn(max = 760.dp)
+            .fillMaxWidth()
             .padding(horizontal = VennelaTokens.gutter, vertical = VennelaTokens.spaceMd)
             .liquidGlass(spec, RoundedCornerShape(VennelaTokens.radiusSheet))
             .padding(horizontal = VennelaTokens.spaceLg, vertical = VennelaTokens.spaceMd)
@@ -1014,6 +1031,7 @@ private fun BottomControls(
                 Text(
                     text = "Resume from ${formatDuration(resumeAt)}",
                     color = palette.textPrimary,
+                    fontFamily = VennelaFonts.Mono,
                     fontSize = VennelaTokens.caption,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -1025,6 +1043,7 @@ private fun BottomControls(
             Text(
                 text = "${formatDuration(shownPosition)} / ${formatDuration(durationMs)}",
                 color = palette.textPrimary,
+                fontFamily = VennelaFonts.Mono,
                 fontSize = VennelaTokens.caption,
                 fontWeight = FontWeight.SemiBold
             )
@@ -1051,6 +1070,7 @@ private fun BottomControls(
             CircleAction(Icons.Default.Replay10, "Back 10 seconds", onSkipBack)
             Box(
                 modifier = Modifier.size(62.dp)
+                    .testTag("video_play_pause_button")
                     .clip(CircleShape)
                     .background(Brush.radialGradient(listOf(accent.secondary, accent.primary)))
                     .border(1.5.dp, palette.textPrimary.copy(alpha = 0.85f), CircleShape)
@@ -1120,7 +1140,15 @@ private fun BottomControls(
                     )
                 }
             }
-            item { PlayerChip("Shuffle", Icons.Default.Shuffle, shuffle, onShuffle) }
+            item {
+                PlayerChip(
+                    text = "Shuffle",
+                    icon = Icons.Default.Shuffle,
+                    isActive = shuffle,
+                    modifier = Modifier.testTag("video_shuffle_button"),
+                    onClick = onShuffle
+                )
+            }
             item {
                 PlayerChip(
                     text = if (repeatOne) "Repeat one" else "Repeat",
@@ -1129,8 +1157,8 @@ private fun BottomControls(
                     onClick = onRepeat
                 )
             }
-            item { PlayerChip("Tracks", Icons.Default.Audiotrack, onClick = onTracks) }
-            item { PlayerChip("Playlist", Icons.AutoMirrored.Filled.PlaylistPlay, onClick = onPlaylist) }
+            item { PlayerChip("Tracks", Icons.Default.Audiotrack, modifier = Modifier.testTag("video_tracks_button"), onClick = onTracks) }
+            item { PlayerChip("Playlist", Icons.AutoMirrored.Filled.PlaylistPlay, modifier = Modifier.testTag("video_playlist_button"), onClick = onPlaylist) }
         }
     }
 }
@@ -1170,11 +1198,12 @@ private fun PlayerChip(
     text: String,
     icon: ImageVector? = null,
     isActive: Boolean = false,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     LiquidChip(
         text = text,
-        modifier = Modifier.heightIn(min = VennelaTokens.touchTargetMin),
+        modifier = modifier.heightIn(min = VennelaTokens.touchTargetMin),
         icon = icon,
         isActive = isActive,
         onClick = onClick
@@ -1278,7 +1307,10 @@ private fun PlayerSheetPanel(
         elevation = VennelaTokens.elevationOverlay
     )
     Column(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .navigationBarsPadding()
+            .widthIn(max = 760.dp)
+            .fillMaxWidth()
             .heightIn(max = 440.dp)
             .padding(horizontal = VennelaTokens.spaceSm)
             .liquidGlass(spec, RoundedCornerShape(VennelaTokens.radiusSheet))

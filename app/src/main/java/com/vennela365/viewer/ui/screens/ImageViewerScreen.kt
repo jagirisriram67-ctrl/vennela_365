@@ -20,11 +20,14 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
@@ -61,6 +64,7 @@ import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -77,20 +81,27 @@ import com.vennela365.viewer.storage.ShareUri
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
 import com.vennela365.viewer.theme.LiquidMotion
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.ui.components.GlassPanel
 import com.vennela365.viewer.ui.components.IconBadge
 import com.vennela365.viewer.ui.components.LiquidChip
 import com.vennela365.viewer.ui.components.LiquidPage
+import com.vennela365.viewer.ui.components.OkenScanFilter
 import com.vennela365.viewer.ui.components.ReaderIconButton
 import com.vennela365.viewer.ui.components.ReaderTopToolbar
+import com.vennela365.viewer.ui.components.SuiteStyleSwitcherStrip
 import com.vennela365.viewer.ui.components.VennelaEmptyState
 import com.vennela365.viewer.ui.components.VennelaErrorState
 import com.vennela365.viewer.ui.components.VennelaLoadingState
+import com.vennela365.viewer.ui.components.ViewerSuiteStyle
 import com.vennela365.viewer.ui.components.pressScale
+import com.vennela365.viewer.ui.components.rememberSuiteSessionState
 import com.vennela365.viewer.ui.components.staggeredEntrance
 import com.vennela365.viewer.viewmodel.MainViewModel
 import com.vennela365.viewer.viewmodel.Screen
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -107,6 +118,41 @@ private enum class ImageFit(val label: String) {
     Fill("Fill"),
     Actual("100%"),
     Free("Free")
+}
+
+/** Non-destructive GPU color grading presets. */
+private enum class ImageColorPreset(val label: String) {
+    Original("Original"),
+    Vivid("Vivid"),
+    Warm("Warm"),
+    Cool("Cool"),
+    Mono("Mono")
+}
+
+private fun ImageColorPreset.toColorFilter(): ColorFilter? = when (this) {
+    ImageColorPreset.Original -> null
+    ImageColorPreset.Mono -> ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })
+    ImageColorPreset.Vivid -> ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(1.42f) })
+    ImageColorPreset.Warm -> ColorFilter.colorMatrix(
+        ColorMatrix(
+            floatArrayOf(
+                1.08f, 0f, 0f, 0f, 8f,
+                0f, 1.02f, 0f, 0f, 4f,
+                0f, 0f, 0.88f, 0f, -6f,
+                0f, 0f, 0f, 1f, 0f
+            )
+        )
+    )
+    ImageColorPreset.Cool -> ColorFilter.colorMatrix(
+        ColorMatrix(
+            floatArrayOf(
+                0.92f, 0f, 0f, 0f, -4f,
+                0f, 1.0f, 0f, 0f, 2f,
+                0f, 0f, 1.12f, 0f, 10f,
+                0f, 0f, 0f, 1f, 0f
+            )
+        )
+    )
 }
 
 /** Load state of the hero image, used to drive the frosted skeleton. */
@@ -166,8 +212,10 @@ private fun cacheExif(id: String, value: ImageExif): ImageExif {
 fun ImageViewerScreen(viewModel: MainViewModel) {
     val selectedFile by viewModel.selectedFile.collectAsState()
     val viewerState by viewModel.viewerState.collectAsState()
+    val activeSuite by viewModel.preferredSuiteStyle.collectAsState()
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
+    val suiteSession = rememberSuiteSessionState(activeSuite, palette.isDark)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val file = selectedFile
@@ -186,6 +234,8 @@ fun ImageViewerScreen(viewModel: MainViewModel) {
     var offsetX by remember(file?.id) { mutableFloatStateOf(0f) }
     var offsetY by remember(file?.id) { mutableFloatStateOf(0f) }
     var fit by remember(file?.id) { mutableStateOf(ImageFit.Fit) }
+    var colorPreset by remember(file?.id) { mutableStateOf(ImageColorPreset.Original) }
+    var showGrid by remember(file?.id) { mutableStateOf(false) }
     var showInfo by remember { mutableStateOf(false) }
     var chromeVisible by remember { mutableStateOf(true) }
     var keepScreenOn by remember { mutableStateOf(false) }
@@ -521,10 +571,19 @@ fun ImageViewerScreen(viewModel: MainViewModel) {
                             },
                         contentAlignment = Alignment.Center
                     ) {
+                        val effectiveColorFilter = remember(activeSuite, suiteSession.scanFilter, colorPreset) {
+                            if (activeSuite == ViewerSuiteStyle.OKEN_SCANNER && suiteSession.scanFilter != OkenScanFilter.ORIGINAL) {
+                                suiteSession.scanFilter.toColorFilter()
+                            } else {
+                                colorPreset.toColorFilter()
+                            }
+                        }
+
                         AsyncImage(
                             model = request,
                             contentDescription = "Image ${file.name}, ${zoomPercent}% zoom",
                             contentScale = ContentScale.Fit,
+                            colorFilter = effectiveColorFilter,
                             onLoading = { load = ImageLoad.Loading },
                             onSuccess = { load = ImageLoad.Ready },
                             onError = { load = ImageLoad.Failed },
@@ -538,6 +597,53 @@ fun ImageViewerScreen(viewModel: MainViewModel) {
                                     translationY = offsetY
                                 )
                         )
+
+                        if (activeSuite == ViewerSuiteStyle.OKEN_SCANNER && load == ImageLoad.Ready) {
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                if (suiteSession.showAutoCropHandles) {
+                                    val turquoise = Color(0xFF00D2A0)
+                                    val stroke = 2.8.dp.toPx()
+                                    val pad = 28.dp.toPx()
+                                    val corner = 26.dp.toPx()
+                                    val w = size.width - pad * 2
+                                    val h = size.height - pad * 2
+                                    drawRect(
+                                        color = turquoise.copy(alpha = 0.72f),
+                                        topLeft = Offset(pad, pad),
+                                        size = androidx.compose.ui.geometry.Size(w, h),
+                                        style = Stroke(width = 1.5.dp.toPx())
+                                    )
+                                    drawLine(turquoise, Offset(pad, pad), Offset(pad + corner, pad), stroke)
+                                    drawLine(turquoise, Offset(pad, pad), Offset(pad, pad + corner), stroke)
+                                    drawLine(turquoise, Offset(pad + w, pad), Offset(pad + w - corner, pad), stroke)
+                                    drawLine(turquoise, Offset(pad + w, pad), Offset(pad + w, pad + corner), stroke)
+                                    drawLine(turquoise, Offset(pad, pad + h), Offset(pad + corner, pad + h), stroke)
+                                    drawLine(turquoise, Offset(pad, pad + h), Offset(pad, pad + h - corner), stroke)
+                                    drawLine(turquoise, Offset(pad + w, pad + h), Offset(pad + w - corner, pad + h), stroke)
+                                    drawLine(turquoise, Offset(pad + w, pad + h), Offset(pad + w, pad + h - corner), stroke)
+                                }
+                                if (suiteSession.showOfficialStamp) {
+                                    val stampRed = Color(0xFFD93025).copy(alpha = 0.80f)
+                                    val center = Offset(size.width - 78.dp.toPx(), size.height - 140.dp.toPx())
+                                    rotate(-14f, pivot = center) {
+                                        drawCircle(stampRed, radius = 38.dp.toPx(), center = center, style = Stroke(width = 2.5.dp.toPx()))
+                                        drawCircle(stampRed, radius = 32.dp.toPx(), center = center, style = Stroke(width = 1.dp.toPx()))
+                                    }
+                                }
+                            }
+                        }
+
+                        if (showGrid && load == ImageLoad.Ready) {
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                val lineColor = Color.White.copy(alpha = 0.28f)
+                                val thirdW = size.width / 3f
+                                val thirdH = size.height / 3f
+                                drawLine(lineColor, Offset(thirdW, 0f), Offset(thirdW, size.height), strokeWidth = 1.dp.toPx())
+                                drawLine(lineColor, Offset(thirdW * 2f, 0f), Offset(thirdW * 2f, size.height), strokeWidth = 1.dp.toPx())
+                                drawLine(lineColor, Offset(0f, thirdH), Offset(size.width, thirdH), strokeWidth = 1.dp.toPx())
+                                drawLine(lineColor, Offset(0f, thirdH * 2f), Offset(size.width, thirdH * 2f), strokeWidth = 1.dp.toPx())
+                            }
+                        }
 
                         if (load == ImageLoad.Loading) {
                             ImageSkeleton(modifier = Modifier.fillMaxSize())
@@ -652,10 +758,52 @@ fun ImageViewerScreen(viewModel: MainViewModel) {
                     ) {
                         Column(
                             modifier = Modifier
+                                .widthIn(max = 760.dp)
                                 .fillMaxWidth()
                                 .padding(bottom = pagePadding.calculateBottomPadding()),
                             verticalArrangement = Arrangement.spacedBy(VennelaTokens.spaceSm)
                         ) {
+                            // Suite Switcher + Oken Scanner HD Filter Rail
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = VennelaTokens.gutter),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                SuiteStyleSwitcherStrip(
+                                    activeSuite = activeSuite,
+                                    onSelectSuite = { viewModel.setPreferredSuiteStyle(it) },
+                                    isDark = true
+                                )
+                                if (activeSuite == ViewerSuiteStyle.OKEN_SCANNER) {
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        items(OkenScanFilter.entries) { filter ->
+                                            LiquidChip(
+                                                text = filter.label,
+                                                isActive = suiteSession.scanFilter == filter,
+                                                onClick = { suiteSession.scanFilter = filter }
+                                            )
+                                        }
+                                        item {
+                                            LiquidChip(
+                                                text = "Auto-Crop",
+                                                isActive = suiteSession.showAutoCropHandles,
+                                                onClick = { suiteSession.showAutoCropHandles = !suiteSession.showAutoCropHandles }
+                                            )
+                                        }
+                                        item {
+                                            LiquidChip(
+                                                text = "Official Stamp",
+                                                isActive = suiteSession.showOfficialStamp,
+                                                onClick = { suiteSession.showOfficialStamp = !suiteSession.showOfficialStamp }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
                             Filmstrip(
                                 strip = strip,
                                 currentIndex = currentIndex,
@@ -665,11 +813,15 @@ fun ImageViewerScreen(viewModel: MainViewModel) {
 
                             ImageToolDock(
                                 fit = fit,
+                                colorPreset = colorPreset,
+                                showGrid = showGrid,
                                 zoomPercent = zoomPercent,
                                 canZoomOut = scale > 0.26f,
                                 showInfo = showInfo,
                                 keepScreenOn = keepScreenOn,
                                 onFit = { selectFit(it) },
+                                onColorPreset = { colorPreset = it },
+                                onToggleGrid = { showGrid = !showGrid },
                                 onZoom = { applyZoom(if (scale > 1.5f) 1f else 2f) },
                                 onZoomOut = { applyZoom(scale / 1.5f) },
                                 onRotateLeft = {
@@ -684,6 +836,8 @@ fun ImageViewerScreen(viewModel: MainViewModel) {
                                 onReset = {
                                     rotation = 0f
                                     flipped = false
+                                    colorPreset = ImageColorPreset.Original
+                                    showGrid = false
                                     selectFit(ImageFit.Fit)
                                 },
                                 onToggleInfo = { showInfo = !showInfo },
@@ -888,6 +1042,7 @@ private fun ViewerStatPill(text: String) {
         Text(
             text = text,
             color = Color.White,
+            fontFamily = VennelaFonts.Mono,
             fontSize = VennelaTokens.micro,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
@@ -986,11 +1141,15 @@ private fun Filmstrip(
 @Composable
 private fun ImageToolDock(
     fit: ImageFit,
+    colorPreset: ImageColorPreset,
+    showGrid: Boolean,
     zoomPercent: Int,
     canZoomOut: Boolean,
     showInfo: Boolean,
     keepScreenOn: Boolean,
     onFit: (ImageFit) -> Unit,
+    onColorPreset: (ImageColorPreset) -> Unit,
+    onToggleGrid: () -> Unit,
     onZoom: () -> Unit,
     onZoomOut: () -> Unit,
     onRotateLeft: () -> Unit,
@@ -1018,13 +1177,23 @@ private fun ImageToolDock(
                 contentPadding = PaddingValues(horizontal = VennelaTokens.spaceMd),
                 horizontalArrangement = Arrangement.spacedBy(VennelaTokens.spaceSm)
             ) {
-                items(ImageFit.entries.toList(), key = { it.name }) { mode ->
+                items(ImageFit.entries.toList(), key = { "fit_${it.name}" }) { mode ->
                     Box( modifier = Modifier.heightIn(min = VennelaTokens.touchTargetMin), contentAlignment = Alignment.Center ) {
                         LiquidChip(
                             text = mode.label,
                             icon = if (mode == ImageFit.Actual) Icons.Default.AspectRatio else null,
                             isActive = fit == mode,
                             onClick = { onFit(mode) }
+                        )
+                    }
+                }
+                items(ImageColorPreset.entries.toList(), key = { "preset_${it.name}" }) { preset ->
+                    Box( modifier = Modifier.heightIn(min = VennelaTokens.touchTargetMin), contentAlignment = Alignment.Center ) {
+                        LiquidChip(
+                            text = preset.label,
+                            icon = if (preset == ImageColorPreset.Original) Icons.Default.AutoFixHigh else null,
+                            isActive = colorPreset == preset,
+                            onClick = { onColorPreset(preset) }
                         )
                     }
                 }
@@ -1043,6 +1212,7 @@ private fun ImageToolDock(
                         label = "Out",
                         description = "Zoom out",
                         enabled = canZoomOut,
+                        modifier = Modifier.testTag("image_zoom_out_button"),
                         onClick = onZoomOut
                     )
                 }
@@ -1052,6 +1222,7 @@ private fun ImageToolDock(
                         label = "$zoomPercent%",
                         description = "Zoom in",
                         active = zoomPercent > 100,
+                        modifier = Modifier.testTag("image_zoom_in_button"),
                         onClick = onZoom
                     )
                 }
@@ -1068,6 +1239,7 @@ private fun ImageToolDock(
                         icon = Icons.AutoMirrored.Filled.RotateRight,
                         label = "Right",
                         description = "Rotate 90 degrees clockwise",
+                        modifier = Modifier.testTag("image_rotate_right_button"),
                         onClick = onRotateRight
                     )
                 }
@@ -1076,14 +1248,25 @@ private fun ImageToolDock(
                         icon = Icons.Default.Flip,
                         label = "Mirror",
                         description = "Mirror the image horizontally",
+                        modifier = Modifier.testTag("image_flip_button"),
                         onClick = onFlip
+                    )
+                }
+                item {
+                    ViewerDockAction(
+                        icon = Icons.Default.GridOn,
+                        label = "Grid",
+                        description = if (showGrid) "Hide composition grid" else "Show rule-of-thirds grid",
+                        active = showGrid,
+                        modifier = Modifier.testTag("image_grid_button"),
+                        onClick = onToggleGrid
                     )
                 }
                 item {
                     ViewerDockAction(
                         icon = Icons.Default.FitScreen,
                         label = "Reset",
-                        description = "Reset zoom, rotation and mirroring",
+                        description = "Reset zoom, rotation, filters and mirroring",
                         onClick = onReset
                     )
                 }
@@ -1093,6 +1276,7 @@ private fun ImageToolDock(
                         label = "Details",
                         description = if (showInfo) "Hide image details" else "Show image details",
                         active = showInfo,
+                        modifier = Modifier.testTag("image_info_button"),
                         onClick = onToggleInfo
                     )
                 }
@@ -1149,12 +1333,13 @@ private fun ViewerDockAction(
     description: String,
     active: Boolean = false,
     enabled: Boolean = true,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
     Column(
-        modifier = Modifier
+        modifier = modifier
             .heightIn(min = VennelaTokens.touchTargetMin)
             .clip(RoundedCornerShape(VennelaTokens.radiusControl))
             .pressScale(pressedScale = 0.92f, onClick = if (enabled) onClick else null)

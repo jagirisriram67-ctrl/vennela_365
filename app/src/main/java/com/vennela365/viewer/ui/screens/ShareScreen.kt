@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -28,12 +29,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.FolderZip
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Podcasts
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
@@ -44,6 +44,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,16 +58,19 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.core.graphics.drawable.toBitmap
 import com.vennela365.viewer.model.FileItem
 import com.vennela365.viewer.rendering.ViewerState
 import com.vennela365.viewer.theme.LiquidMotion
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.ui.components.FileBrandBadge
 import com.vennela365.viewer.ui.components.GlassDivider
@@ -83,8 +87,13 @@ import com.vennela365.viewer.ui.components.pressScale
 import com.vennela365.viewer.viewmodel.MainViewModel
 import com.vennela365.viewer.viewmodel.Screen
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.vennela365.viewer.storage.ShareUri
+import java.io.File
+import java.io.FileOutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 /** One real, installed app that can receive an `ACTION_SEND` intent. */
 private data class ShareAppTarget(
@@ -111,6 +120,7 @@ fun ShareScreen(
 
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
+    val scope = rememberCoroutineScope()
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
 
@@ -125,6 +135,7 @@ fun ShareScreen(
 
     val busy = viewerState is ViewerState.Loading || viewerState is ViewerState.Detecting
     val failure = viewerState as? ViewerState.Failed
+    var compressing by remember { mutableStateOf(false) }
 
     fun shareNow(target: FileItem) {
         val intent = sendIntentFor(context, target)
@@ -133,6 +144,76 @@ fun ShareScreen(
             return
         }
         context.startActivity(Intent.createChooser(intent, "Share ${target.name}"))
+    }
+
+    fun openExternal(target: FileItem) {
+        val intent = ShareUri.viewIntent(context, target.uri, target.formatInfo.mimeType)
+        if (intent == null) {
+            Toast.makeText(context, "${target.name} has no shareable location", Toast.LENGTH_SHORT).show()
+            return
+        }
+        runCatching {
+            context.startActivity(Intent.createChooser(intent, "Open ${target.name} with"))
+        }.onFailure {
+            Toast.makeText(context, "No installed app can open this file", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun shareMetadataSummary(target: FileItem) {
+        val summary = buildString {
+            appendLine(target.name)
+            appendLine("Format: ${target.formatInfo.name} (.${target.extension.uppercase()})")
+            appendLine("Category: ${target.formatInfo.category.displayName}")
+            appendLine("MIME: ${target.formatInfo.mimeType}")
+            appendLine("Size: ${target.formattedSize}")
+            appendLine("Modified: ${target.formattedDate}")
+            if (target.path.isNotBlank()) appendLine("Path: ${target.path}")
+        }
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, target.name)
+            putExtra(Intent.EXTRA_TEXT, summary)
+        }
+        context.startActivity(Intent.createChooser(intent, "Share details for ${target.name}"))
+    }
+
+    fun compressAndShare(target: FileItem) {
+        if (compressing) return
+        val uri = target.uri
+        if (uri == null) {
+            Toast.makeText(context, "${target.name} has no readable location", Toast.LENGTH_SHORT).show()
+            return
+        }
+        compressing = true
+        scope.launch {
+            val zipResult = withContext(Dispatchers.IO) {
+                runCatching {
+                    val shareDir = File(context.cacheDir, "share_zips").apply { mkdirs() }
+                    val safeName = target.name.replace(Regex("[^A-Za-z0-9._-]"), "_")
+                    val zipFile = File(shareDir, "$safeName.zip")
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        ZipOutputStream(FileOutputStream(zipFile)).use { zos ->
+                            zos.putNextEntry(ZipEntry(target.name))
+                            input.copyTo(zos)
+                            zos.closeEntry()
+                        }
+                    } ?: error("Cannot read source stream")
+                    FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", zipFile)
+                }
+            }
+            compressing = false
+            zipResult.onSuccess { zipUri ->
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/zip"
+                    putExtra(Intent.EXTRA_STREAM, zipUri)
+                    putExtra(Intent.EXTRA_TITLE, "${target.name}.zip")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(intent, "Share ${target.name}.zip"))
+            }.onFailure { err ->
+                Toast.makeText(context, "Could not zip file: ${err.message ?: "error"}", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     LiquidPage(
@@ -145,6 +226,7 @@ fun ShareScreen(
                 Box(
                     modifier = Modifier
                         .size(VennelaTokens.touchTargetMin)
+                        .testTag("share_topbar_button")
                         .shadow(
                             elevation = 14.dp,
                             shape = RoundedCornerShape(VennelaTokens.radiusControl),
@@ -179,8 +261,11 @@ fun ShareScreen(
             }
         }
     ) { pagePadding ->
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = 820.dp),
             contentPadding = PaddingValues(
                 start = VennelaTokens.gutter,
                 end = VennelaTokens.gutter,
@@ -251,17 +336,24 @@ fun ShareScreen(
                         GlassPanel(modifier = Modifier.fillMaxWidth()) {
                             Column(modifier = Modifier.padding(vertical = VennelaTokens.spaceXs)) {
                                 val actions = listOf(
-                                    ShareAction("Copy file name", "Also copies the Vennela 365 reference link", Icons.Default.ContentCopy),
-                                    ShareAction("Create shareable link", "Secure link that expires after 24 hours", Icons.Default.Link),
-                                    ShareAction("Compress & share", "Zip the file before sending it on", Icons.Default.FolderZip),
-                                    ShareAction("Share as PDF", "Printable copy, original stays untouched", Icons.Default.PictureAsPdf)
+                                    ShareAction("Copy file info", "Copies file name and device path to clipboard", Icons.Default.ContentCopy),
+                                    ShareAction("Open with another app", "Hand the untouched file to any installed viewer", Icons.AutoMirrored.Filled.OpenInNew),
+                                    ShareAction(
+                                        title = if (compressing) "Zipping…" else "Compress & share (.zip)",
+                                        subtitle = "Package into a ZIP archive and share offline",
+                                        icon = Icons.Default.FolderZip
+                                    ),
+                                    ShareAction("Share file summary", "Send format, MIME, size and path as plain text", Icons.Default.Description)
+                                )
+                                val actionTags = listOf(
+                                    "share_action_copy_info",
+                                    "share_action_open_with",
+                                    "share_action_compress",
+                                    "share_action_summary"
                                 )
                                 actions.forEachIndexed { index, action ->
-                                    // Cascade the quick actions in (note:
-                                    // animateFloatAsState would start at its
-                                    // target, so an Animatable is used here).
                                     val entered = remember { Animatable(0f) }
-                                    LaunchedEffect(action.title) {
+                                    LaunchedEffect(index) {
                                         entered.animateTo(
                                             targetValue = 1f,
                                             animationSpec = LiquidMotion.cascade(index, stepMillis = 60)
@@ -270,13 +362,15 @@ fun ShareScreen(
                                     GlassListRow(
                                         title = action.title,
                                         subtitle = action.subtitle,
-                                        modifier = Modifier.graphicsLayer {
-                                            val t = entered.value
-                                            alpha = t
-                                            translationY = (1f - t) * 18f
-                                            scaleX = 0.96f + 0.04f * t
-                                            scaleY = 0.96f + 0.04f * t
-                                        },
+                                        modifier = Modifier
+                                            .testTag(actionTags[index])
+                                            .graphicsLayer {
+                                                val t = entered.value
+                                                alpha = t
+                                                translationY = (1f - t) * 18f
+                                                scaleX = 0.96f + 0.04f * t
+                                                scaleY = 0.96f + 0.04f * t
+                                            },
                                         leading = {
                                             IconBadge(
                                                 icon = action.icon,
@@ -288,18 +382,18 @@ fun ShareScreen(
                                         },
                                         showChevron = true,
                                         onClick = {
-                                            when (action.title) {
-                                                "Copy file name" -> {
-                                                    clipboardManager.setText(
-                                                        AnnotatedString("vennela365://share/${file.name}")
-                                                    )
-                                                    Toast.makeText(context, "Share reference copied", Toast.LENGTH_SHORT).show()
+                                            when (index) {
+                                                0 -> {
+                                                    val text = buildString {
+                                                        append(file.name)
+                                                        if (file.path.isNotBlank()) append(" (${file.path})")
+                                                    }
+                                                    clipboardManager.setText(AnnotatedString(text))
+                                                    Toast.makeText(context, "File info copied", Toast.LENGTH_SHORT).show()
                                                 }
-                                                else -> Toast.makeText(
-                                                    context,
-                                                    "${action.title} • ${file.name}",
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
+                                                1 -> openExternal(file)
+                                                2 -> compressAndShare(file)
+                                                else -> shareMetadataSummary(file)
                                             }
                                         }
                                     )
@@ -313,6 +407,7 @@ fun ShareScreen(
                         SectionHeader(
                             title = "Share via",
                             actionLabel = "All apps",
+                            modifier = Modifier.testTag("share_all_apps_button"),
                             onAction = { shareNow(file) }
                         )
                     }
@@ -369,6 +464,7 @@ fun ShareScreen(
                                         LiquidButton(
                                             label = "Open system share sheet",
                                             icon = Icons.AutoMirrored.Filled.OpenInNew,
+                                            modifier = Modifier.testTag("share_system_sheet_button"),
                                             onClick = { shareNow(file) }
                                         )
                                     }
@@ -472,6 +568,7 @@ fun ShareScreen(
                         GlassPanel(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .testTag("share_nearby_card")
                                 .shadow(
                                     elevation = 14.dp,
                                     shape = RoundedCornerShape(VennelaTokens.radiusCardLarge),
@@ -517,12 +614,14 @@ fun ShareScreen(
                                     Text(
                                         text = "Nearby transfer",
                                         color = palette.textPrimary,
+                                        fontFamily = VennelaFonts.Sans,
                                         fontSize = VennelaTokens.titleSmall,
                                         fontWeight = FontWeight.SemiBold
                                     )
                                     Text(
                                         text = "Send over Bluetooth or quick share, no internet needed",
                                         color = palette.textSecondary,
+                                        fontFamily = VennelaFonts.Sans,
                                         fontSize = VennelaTokens.caption,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -539,6 +638,7 @@ fun ShareScreen(
                     }
                 }
             }
+        }
         }
     }
 }
@@ -591,6 +691,7 @@ private fun SelectedFileCard(
                 Text(
                     text = file.name,
                     color = palette.textPrimary,
+                    fontFamily = VennelaFonts.Sans,
                     fontSize = VennelaTokens.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -600,6 +701,7 @@ private fun SelectedFileCard(
                 Text(
                     text = "${file.extension.uppercase()} • ${file.formatInfo.category.displayName} • ${file.formattedSize}",
                     color = palette.textSecondary,
+                    fontFamily = VennelaFonts.Mono,
                     fontSize = VennelaTokens.caption,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -608,6 +710,7 @@ private fun SelectedFileCard(
                     Text(
                         text = file.path,
                         color = palette.textTertiary,
+                        fontFamily = VennelaFonts.Mono,
                         fontSize = VennelaTokens.micro,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -617,12 +720,14 @@ private fun SelectedFileCard(
                 Text(
                     text = "Modified ${file.formattedDate}",
                     color = palette.textTertiary,
+                    fontFamily = VennelaFonts.Mono,
                     fontSize = VennelaTokens.micro
                 )
             }
             Box(
                 modifier = Modifier
                     .size(VennelaTokens.touchTargetMin)
+                    .testTag("share_selected_details_button")
                     .clip(RoundedCornerShape(VennelaTokens.radiusControl))
                     .pressScale(pressedScale = 0.90f, onClick = onDetails),
                 contentAlignment = Alignment.Center

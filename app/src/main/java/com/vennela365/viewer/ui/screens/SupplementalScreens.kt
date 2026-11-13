@@ -37,7 +37,10 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import android.text.format.Formatter
+import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -63,6 +66,10 @@ import com.vennela365.viewer.ui.components.*
 import com.vennela365.viewer.viewmodel.MainViewModel
 import com.vennela365.viewer.viewmodel.Screen
 import com.vennela365.viewer.viewmodel.SortMode
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 
 /**
  * Extended screen inventory — spec §3 Groups A–I.
@@ -90,8 +97,8 @@ fun SupplementalScreen(screen: Screen, viewModel: MainViewModel) {
         Screen.EncodingSelection -> EncodingSelectionScreen(viewModel)
         Screen.ImageGallery -> ImageGalleryScreen(viewModel)
         Screen.ImageExif -> ImageExifScreen(viewModel)
-        Screen.AnimatedImage -> AnimatedImageScreen(viewModel)
-        Screen.SvgVector -> SvgVectorScreen(viewModel)
+        Screen.AnimatedImage -> LiveAnimatedImageScreen(viewModel)
+        Screen.SvgVector -> SandboxedSvgViewerScreen(viewModel)
         Screen.RawFallback -> RawFallbackScreen(viewModel)
         Screen.PdfToc -> PdfTocScreen(viewModel)
         Screen.PdfSearch -> PdfSearchScreen(viewModel)
@@ -99,13 +106,13 @@ fun SupplementalScreen(screen: Screen, viewModel: MainViewModel) {
         Screen.CsvTable -> CsvTableScreen(viewModel)
         Screen.ChartPreview -> ChartPreviewScreen(viewModel)
         Screen.PresentationOutline -> PresentationOutlineScreen(viewModel)
-        Screen.OpenDocument -> DocumentViewerScreen(viewModel)
-        Screen.StructuredData -> StructuredDataScreen(viewModel)
+        Screen.OpenDocument -> PublicationViewerScreen(viewModel)
+        Screen.StructuredData -> StructuredDataInspectorScreen(viewModel)
         Screen.MarkdownSource -> MarkdownSourceScreen(viewModel)
         Screen.DiagramFallback -> DiagramFallbackScreen(viewModel)
         Screen.NotebookViewer -> NotebookViewerScreen(viewModel)
         Screen.AudioMetadata -> AudioMetadataScreen(viewModel)
-        Screen.TrackInfo -> TrackInfoScreen(viewModel)
+        Screen.TrackInfo -> TimedTrackReaderScreen(viewModel)
         Screen.NestedArchive -> NestedArchiveScreen(viewModel)
         Screen.HexViewer -> HexViewerScreen(viewModel)
         Screen.DatabaseViewer -> DatabaseViewerScreen(viewModel)
@@ -115,12 +122,8 @@ fun SupplementalScreen(screen: Screen, viewModel: MainViewModel) {
         Screen.ModelInspector -> BinaryInspectorScreen(
             viewModel, "Model checkpoint", "Inspect, never run"
         )
-        Screen.CadViewer -> BinaryInspectorScreen(
-            viewModel, "CAD / 3D", "Geometry container & bytes"
-        )
-        Screen.GisViewer -> BinaryInspectorScreen(
-            viewModel, "Geospatial data", "Container & bytes"
-        )
+        Screen.CadViewer -> CadWireframeViewerScreen(viewModel)
+        Screen.GisViewer -> GeoVectorViewerScreen(viewModel)
         Screen.FontViewer -> FontViewerScreen(viewModel)
         Screen.EmailViewer -> EmailReaderScreen(viewModel)
         Screen.ExecutableInspector -> BinaryInspectorScreen(
@@ -233,6 +236,7 @@ private fun SupplementalHero(title: String, subtitle: String?, icon: ImageVector
                 Text(
                     text = title,
                     color = palette.textPrimary,
+                    fontFamily = VennelaFonts.Sans,
                     fontSize = VennelaTokens.titleMedium,
                     fontWeight = FontWeight.Bold,
                     maxLines = 2,
@@ -243,6 +247,7 @@ private fun SupplementalHero(title: String, subtitle: String?, icon: ImageVector
                     Text(
                         text = subtitle,
                         color = palette.textSecondary,
+                        fontFamily = VennelaFonts.Sans,
                         fontSize = VennelaTokens.caption,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
@@ -292,13 +297,17 @@ private fun SupplementalPage(
                     colors = listOf(accent.primary, accent.secondary),
                     size = VennelaTokens.badgeSm,
                     radius = VennelaTokens.radiusBadge,
-                    contentDescription = null
+                    contentDescription = null,
+                    modifier = Modifier.testTag("supplemental_topbar_badge")
                 )
             }
         }
     ) { pagePadding ->
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = 860.dp),
             contentPadding = PaddingValues(
                 start = VennelaTokens.gutter,
                 end = VennelaTokens.gutter,
@@ -314,6 +323,7 @@ private fun SupplementalPage(
                 Column(verticalArrangement = Arrangement.spacedBy(VennelaTokens.spaceMd)) { content() }
             }
             item(key = "footer") { Spacer(modifier = Modifier.height(VennelaTokens.spaceSm)) }
+        }
         }
     }
 }
@@ -420,6 +430,7 @@ private fun PanelTitle(text: String) {
     Text(
         text = text,
         color = LocalVennelaPalette.current.textPrimary,
+        fontFamily = VennelaFonts.Sans,
         fontSize = VennelaTokens.titleMedium,
         fontWeight = FontWeight.Bold
     )
@@ -430,6 +441,7 @@ private fun PanelBody(text: String) {
     Text(
         text = text,
         color = LocalVennelaPalette.current.textSecondary,
+        fontFamily = VennelaFonts.Sans,
         fontSize = VennelaTokens.bodySmall,
         lineHeight = 20.sp
     )
@@ -684,6 +696,7 @@ private fun StatPill(text: String, modifier: Modifier = Modifier) {
         Text(
             text = text,
             color = palette.textPrimary,
+            fontFamily = VennelaFonts.Mono,
             fontSize = VennelaTokens.micro,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
@@ -728,7 +741,7 @@ private fun CodeBlock(text: String, modifier: Modifier = Modifier, maxLines: Int
                 text = text,
                 color = palette.textPrimary,
                 fontSize = VennelaTokens.caption,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = VennelaFonts.Mono,
                 lineHeight = 18.sp,
                 maxLines = maxLines,
                 overflow = TextOverflow.Ellipsis,
@@ -772,6 +785,7 @@ private fun DataTable(columns: List<String>, rows: List<List<String>>) {
                 Text(
                     text = "#",
                     color = palette.textPrimary,
+                    fontFamily = VennelaFonts.Mono,
                     fontSize = VennelaTokens.micro,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.width(40.dp).padding(start = VennelaTokens.spaceSm)
@@ -780,6 +794,7 @@ private fun DataTable(columns: List<String>, rows: List<List<String>>) {
                     Text(
                         text = column,
                         color = palette.textPrimary,
+                        fontFamily = VennelaFonts.Sans,
                         fontSize = VennelaTokens.micro,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
@@ -802,6 +817,7 @@ private fun DataTable(columns: List<String>, rows: List<List<String>>) {
                     Text(
                         text = "${index + 1}",
                         color = accent.secondary,
+                        fontFamily = VennelaFonts.Mono,
                         fontSize = VennelaTokens.micro,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.width(40.dp).padding(start = VennelaTokens.spaceSm)
@@ -810,6 +826,7 @@ private fun DataTable(columns: List<String>, rows: List<List<String>>) {
                         Text(
                             text = cell,
                             color = palette.textPrimary,
+                            fontFamily = VennelaFonts.Mono,
                             fontSize = VennelaTokens.micro,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -1334,6 +1351,7 @@ private fun PasswordProtectedScreen(vm: MainViewModel) = SupplementalPage(
         label = "Unlock (supported formats)",
         icon = Icons.Default.Lock,
         enabled = password.isNotEmpty(),
+        modifier = Modifier.testTag("supplemental_unlock_button"),
         onClick = { vm.navigateBack() }
     )
 }
@@ -1357,6 +1375,7 @@ private fun LargeFileWarningScreen(vm: MainViewModel) = SupplementalPage(
     LiquidButton(
         label = "Continue with streaming",
         icon = Icons.Default.PlayArrow,
+        modifier = Modifier.testTag("supplemental_streaming_button"),
         onClick = {
             if (selected != null) vm.openFile(selected.copy(sizeBytes = 1024)) else vm.navigateBack()
         }
@@ -1546,88 +1565,6 @@ private fun ImageExifScreen(vm: MainViewModel) = SupplementalPage(
 }
 
 @Composable
-private fun AnimatedImageScreen(vm: MainViewModel) = SupplementalPage(
-    viewModel = vm,
-    title = "Animation",
-    subtitle = "GIF / WebP / APNG",
-    icon = Icons.Default.Animation
-) {
-    val playing by vm.isPlayingAudio.collectAsState()
-    val file by vm.selectedFile.collectAsState()
-    InfoCard(title = file?.name ?: "Animated image") {
-        PanelBody("Frame count and duration appear when the decoder exposes them.")
-    }
-    LiquidButton(
-        label = if (playing) "Pause" else "Play",
-        icon = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-        onClick = { vm.toggleAudioPlayback() }
-    )
-    NoteLine("Playback state is honest — pause actually pauses the drawable.")
-}
-
-@Composable
-private fun SvgVectorScreen(vm: MainViewModel) = SupplementalPage(
-    viewModel = vm,
-    title = "Vector",
-    subtitle = "Safe SVG",
-    icon = Icons.Default.Polyline
-) {
-    var zoom by remember { mutableFloatStateOf(1f) }
-    val animatedZoom by animateFloatAsState(
-        targetValue = zoom,
-        animationSpec = LiquidMotion.liquid(),
-        label = "svgZoom"
-    )
-    InfoCard(title = "Sandboxed vector preview") {
-        PanelBody("External references and scripts are disabled. Viewport zoom and pan stay available.")
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Viewport zoom",
-                color = LocalVennelaPalette.current.textSecondary,
-                fontSize = VennelaTokens.caption
-            )
-            Text(
-                text = "${(animatedZoom * 100).toInt()}%",
-                color = LocalVennelaAccent.current.secondary,
-                fontSize = VennelaTokens.titleSmall,
-                fontWeight = FontWeight.Bold
-            )
-        }
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(VennelaTokens.spaceSm)
-                .clip(RoundedCornerShape(VennelaTokens.radiusPill))
-                .background(LocalVennelaPalette.current.cardSurfaceStrong)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth((animatedZoom / 4f).coerceIn(0.05f, 1f))
-                    .clip(RoundedCornerShape(VennelaTokens.radiusPill))
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(
-                                LocalVennelaAccent.current.primary,
-                                LocalVennelaAccent.current.secondary
-                            )
-                        )
-                    )
-            )
-        }
-        VennelaZoomControls(
-            onZoomIn = { zoom = (zoom + 0.25f).coerceAtMost(4f) },
-            onZoomOut = { zoom = (zoom - 0.25f).coerceAtLeast(0.5f) },
-            onFit = { zoom = 1f }
-        )
-    }
-}
-
-@Composable
 private fun RawFallbackScreen(vm: MainViewModel) = SupplementalPage(
     viewModel = vm,
     title = "RAW photo",
@@ -1793,6 +1730,12 @@ private fun CsvTableScreen(vm: MainViewModel) = SupplementalPage(
     } else if (cellRows.isEmpty()) {
         InfoCard(title = "Rows") { PanelBody("No row contains \"$csvFilter\".") }
     } else {
+        LiquidButton(
+            label = "Open in Pro Spreadsheet Grid & Charts",
+            icon = Icons.Default.TableChart,
+            modifier = Modifier.testTag("csv_open_pro_grid"),
+            onClick = { vm.navigateTo(Screen.SpreadsheetViewer) }
+        )
         InfoCard(title = "Preview (${cellRows.size} of ${rows.size} rows)") {
             DataTable(columns = sheet.headers, rows = cellRows)
             if (rows.size > cellRows.size) {
@@ -1962,70 +1905,7 @@ private fun PresentationOutlineScreen(vm: MainViewModel) = SupplementalPage(
     }
 }
 
-@Composable
-private fun OpenDocumentScreen(vm: MainViewModel) = SupplementalPage(
-    viewModel = vm,
-    title = "Publication",
-    subtitle = "Ebook / OpenDocument",
-    icon = Icons.AutoMirrored.Filled.MenuBook
-) {
-    val file by vm.selectedFile.collectAsState()
-    InfoCard(title = file?.name ?: "Publication") {
-        PanelBody(
-            "Reflow chapters where the parser supports them; spreadsheet-like ODF renders as a grid. Unsupported " +
-                "structures fall back honestly."
-        )
-    }
-    SafetyBanner("DRM is never circumvented. Locked books state that clearly.", BannerTone.Caution)
-}
-
 // ---- GROUP F: code / data / diagrams ----
-
-@Composable
-private fun StructuredDataScreen(vm: MainViewModel) = SupplementalPage(
-    viewModel = vm,
-    title = "Structured data",
-    subtitle = "Tree + raw",
-    icon = Icons.Default.DataObject
-) {
-    val file by vm.selectedFile.collectAsState()
-    val documentText by vm.documentText.collectAsState()
-    var treeMode by remember { mutableStateOf(true) }
-
-    VennelaSegmentedControl(
-        options = listOf("Tree", "Raw"),
-        selected = if (treeMode) "Tree" else "Raw",
-        onSelect = { treeMode = it == "Tree" }
-    )
-
-    val source = documentText.ifBlank { file?.sampleContent.orEmpty() }
-    when {
-        file == null -> InfoCard {
-            VennelaEmptyState(
-                title = "No structured file open",
-                hint = "Open a JSON, YAML or XML file to read its tree and raw source.",
-                icon = Icons.Default.DataObject,
-                actionLabel = "Browse files",
-                onAction = { vm.navigateTo(Screen.FileExplorer) }
-            )
-        }
-        source.isBlank() -> InfoCard(title = file?.name ?: "data") {
-            PanelBody("This file produced no readable text. Open the hex inspector to look at the raw bytes.")
-        }
-        treeMode -> InfoCard(title = file?.name ?: "data") {
-            CodeBlock(text = source.lineSequence().take(20).joinToString("\n"))
-            if (source.lineSequence().count() > 20) {
-                NoteLine("First 20 lines shown — Raw mode scrolls the full source.")
-            }
-        }
-        else -> InfoCard(title = "Raw source") {
-            CodeBlock(text = source.take(4000))
-            if (source.length > 4000) {
-                NoteLine("Source truncated to the first 4,000 characters for display.")
-            }
-        }
-    }
-}
 
 @Composable
 private fun MarkdownSourceScreen(vm: MainViewModel) = SupplementalPage(
@@ -2086,39 +1966,6 @@ private fun DiagramFallbackScreen(vm: MainViewModel) = SupplementalPage(
     }
 }
 
-@Composable
-private fun NotebookViewerScreen(vm: MainViewModel) = SupplementalPage(
-    viewModel = vm,
-    title = "Notebook",
-    subtitle = "Cells, read-only",
-    icon = Icons.Default.Book
-) {
-    val file by vm.selectedFile.collectAsState()
-    val documentText by vm.documentText.collectAsState()
-    val source = documentText.ifBlank { file?.sampleContent.orEmpty() }
-    SafetyBanner("Cells are never executed. Saved outputs and images render where safe.", BannerTone.Critical)
-    if (file == null) {
-        InfoCard {
-            VennelaEmptyState(
-                title = "No notebook open",
-                hint = "Open an .ipynb file and its cells are listed read-only.",
-                icon = Icons.Default.Book,
-                actionLabel = "Browse files",
-                onAction = { vm.navigateTo(Screen.FileExplorer) }
-            )
-        }
-    } else {
-        InfoCard(title = "Notebook source") {
-            PanelBody("Narrative and code cells are shown as stored — nothing is executed.")
-            if (source.isNotBlank()) {
-                CodeBlock(text = source.take(4000))
-            } else {
-                PanelBody("This notebook has no readable cell text.")
-            }
-        }
-    }
-}
-
 // ---- GROUP G: media detail / archives ----
 
 @Composable
@@ -2162,63 +2009,6 @@ private fun AudioMetadataScreen(vm: MainViewModel) = SupplementalPage(
         icon = Icons.Default.PlayArrow,
         onClick = { vm.navigateTo(Screen.AudioPlayer) }
     )
-}
-
-@Composable
-private fun TrackInfoScreen(vm: MainViewModel) = SupplementalPage(
-    viewModel = vm,
-    title = "Tracks & subtitles",
-    subtitle = "Streams",
-    icon = Icons.Default.Subtitles
-) {
-    val file by vm.selectedFile.collectAsState()
-    val info by vm.mediaInfo.collectAsState()
-
-    if (!info.hasVideo && !info.hasAudio) {
-        InfoCard {
-            VennelaEmptyState(
-                title = "No media streams",
-                hint = "Open an audio or video file and its real streams, resolution and bitrates appear here.",
-                icon = Icons.Default.Subtitles,
-                actionLabel = "Browse files",
-                onAction = { vm.navigateTo(Screen.FileExplorer) }
-            )
-        }
-    } else {
-        ListCard(title = file?.name ?: "Media streams", icon = Icons.Default.Subtitles) {
-            if (info.hasVideo) {
-                VennelaMetadataRow("Video stream", "Active", modifier = Modifier.staggeredEntrance(0))
-                info.resolutionLabel?.let {
-                    GlassDivider()
-                    VennelaMetadataRow("Resolution", it, modifier = Modifier.staggeredEntrance(1))
-                }
-                if (info.frameRate > 0) {
-                    GlassDivider()
-                    VennelaMetadataRow("Frame rate", "${info.frameRate.toInt()} fps", modifier = Modifier.staggeredEntrance(2))
-                }
-            }
-            if (info.hasAudio) {
-                if (info.hasVideo) GlassDivider()
-                VennelaMetadataRow("Audio stream", "Active", modifier = Modifier.staggeredEntrance(3))
-                info.channelLabel?.let {
-                    GlassDivider()
-                    VennelaMetadataRow("Channels", it, modifier = Modifier.staggeredEntrance(4))
-                }
-                if (info.sampleRate > 0) {
-                    GlassDivider()
-                    VennelaMetadataRow("Sample rate", "${info.sampleRate} Hz", modifier = Modifier.staggeredEntrance(5))
-                }
-            }
-            info.bitrateLabel?.let {
-                GlassDivider()
-                VennelaMetadataRow("Container bitrate", it, modifier = Modifier.staggeredEntrance(6))
-            }
-            info.mimeType?.let {
-                GlassDivider()
-                VennelaMetadataRow("MIME", it, modifier = Modifier.staggeredEntrance(7))
-            }
-        }
-    }
 }
 
 @Composable
@@ -2457,33 +2247,6 @@ private fun ModelInspectorScreen(vm: MainViewModel) = SupplementalPage(
 }
 
 @Composable
-private fun CadViewerScreen(vm: MainViewModel) = SupplementalPage(
-    viewModel = vm,
-    title = "CAD / 3D",
-    subtitle = "Geometry or metadata",
-    icon = Icons.Default.ViewInAr
-) {
-    InfoCard(title = "Model preview") {
-        PanelBody(
-            "Orbit and zoom only with an implemented, tested renderer. Otherwise safe textual structure and a clear " +
-                "external-viewer hint."
-        )
-    }
-}
-
-@Composable
-private fun GisViewerScreen(vm: MainViewModel) = SupplementalPage(
-    viewModel = vm,
-    title = "Geospatial",
-    subtitle = "Maps without tracking",
-    icon = Icons.Default.Map
-) {
-    InfoCard(title = "Layer metadata") {
-        PanelBody("CRS, bounds and feature counts where parseable. No location permission is requested to inspect a file.")
-    }
-}
-
-@Composable
 private fun FontViewerScreen(vm: MainViewModel) = SupplementalPage(
     viewModel = vm,
     title = "Typeface",
@@ -2682,16 +2445,53 @@ private fun CacheStorageScreen(vm: MainViewModel) = SupplementalPage(
     icon = Icons.Default.CleaningServices,
     activeTab = "settings"
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var cacheBytes by remember { mutableStateOf<Long?>(null) }
+    var clearing by remember { mutableStateOf(false) }
+
+    fun measureDirBytes(dir: File?): Long {
+        if (dir == null || !dir.exists()) return 0L
+        return dir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+    }
+
+    LaunchedEffect(Unit) {
+        cacheBytes = withContext(Dispatchers.IO) { measureDirBytes(context.cacheDir) }
+    }
+
+    val cacheLabel = cacheBytes?.let { Formatter.formatFileSize(context, it) } ?: "Calculating…"
+
     ListCard(title = "Usage", icon = Icons.Default.CleaningServices) {
-        VennelaMetadataRow("Thumbnails", "Bounded memory + disk cache", modifier = Modifier.staggeredEntrance(0))
+        VennelaMetadataRow("Temp & thumbnail cache", cacheLabel, modifier = Modifier.staggeredEntrance(0))
         GlassDivider()
-        VennelaMetadataRow("Temp previews", "Cleared with cache", modifier = Modifier.staggeredEntrance(1))
+        VennelaMetadataRow("User documents", "Untouched on device", modifier = Modifier.staggeredEntrance(1))
     }
     InfoCard { PanelBody("Clearing cache never deletes your documents.") }
     SecondaryAction(
-        label = "Clear cache (safe)",
+        label = if (clearing) "Clearing cache…" else "Clear cache (safe)",
+        modifier = Modifier.testTag("supplemental_clear_cache_button"),
         icon = Icons.Default.DeleteSweep,
-        onClick = { vm.navigateBack() }
+        onClick = {
+            if (clearing) return@SecondaryAction
+            clearing = true
+            scope.launch {
+                val freed = withContext(Dispatchers.IO) {
+                    val before = measureDirBytes(context.cacheDir)
+                    context.cacheDir?.listFiles()?.forEach { child ->
+                        runCatching { child.deleteRecursively() }
+                    }
+                    val after = measureDirBytes(context.cacheDir)
+                    (before - after).coerceAtLeast(0L)
+                }
+                cacheBytes = withContext(Dispatchers.IO) { measureDirBytes(context.cacheDir) }
+                clearing = false
+                Toast.makeText(
+                    context,
+                    "Cleared ${Formatter.formatFileSize(context, freed)}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
     )
 }
 
@@ -2726,7 +2526,8 @@ private fun HelpFormatsScreen(vm: MainViewModel) = SupplementalPage(
     VennelaSearchField(
         value = query,
         onValueChange = { vm.setRegistryQuery(it) },
-        placeholder = "Search ${dashboard.totalPatterns} extensions…"
+        placeholder = "Search ${dashboard.totalPatterns} extensions…",
+        modifier = Modifier.testTag("supplemental_format_search_field")
     )
 
     val results = remember(query) {

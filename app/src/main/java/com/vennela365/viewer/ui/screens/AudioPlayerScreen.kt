@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -81,6 +82,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -94,6 +96,7 @@ import com.vennela365.viewer.model.FileItem
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
 import com.vennela365.viewer.theme.LiquidMotion
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.theme.liquidGlassSpec
 import com.vennela365.viewer.theme.liquidGlass
@@ -281,6 +284,7 @@ fun AudioPlayerScreen(viewModel: MainViewModel) {
             item {
                 Row(
                     modifier = Modifier
+                        .widthIn(max = 640.dp)
                         .fillMaxWidth()
                         .padding(top = VennelaTokens.spaceLg),
                     verticalAlignment = Alignment.CenterVertically
@@ -352,7 +356,12 @@ fun AudioPlayerScreen(viewModel: MainViewModel) {
                 val scrubFraction = remember { mutableStateOf(-1f) }
                 val shownProgress = if (scrubFraction.value >= 0f) scrubFraction.value else progress
 
-                Column(modifier = Modifier.padding(top = VennelaTokens.spaceLg)) {
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = 640.dp)
+                        .fillMaxWidth()
+                        .padding(top = VennelaTokens.spaceLg)
+                ) {
                     WaveformSeekBar(
                         progress = shownProgress,
                         playedColor = accent.secondary,
@@ -378,12 +387,14 @@ fun AudioPlayerScreen(viewModel: MainViewModel) {
                         Text(
                             text = formatDuration(shownPosition),
                             color = palette.textSecondary,
+                            fontFamily = VennelaFonts.Mono,
                             fontSize = VennelaTokens.caption,
                             fontWeight = if (scrubFraction.value >= 0f) FontWeight.Bold else FontWeight.Normal
                         )
                         Text(
                             text = formatDuration(durationMs),
                             color = palette.textSecondary,
+                            fontFamily = VennelaFonts.Mono,
                             fontSize = VennelaTokens.caption
                         )
                     }
@@ -412,6 +423,7 @@ fun AudioPlayerScreen(viewModel: MainViewModel) {
             item {
                 Row(
                     modifier = Modifier
+                        .widthIn(max = 640.dp)
                         .fillMaxWidth()
                         .padding(top = VennelaTokens.spaceLg),
                     verticalAlignment = Alignment.CenterVertically
@@ -432,6 +444,7 @@ fun AudioPlayerScreen(viewModel: MainViewModel) {
                 }
                 LazyRow(
                     modifier = Modifier
+                        .widthIn(max = 640.dp)
                         .fillMaxWidth()
                         .padding(top = VennelaTokens.spaceSm),
                     horizontalArrangement = Arrangement.spacedBy(VennelaTokens.spaceSm),
@@ -456,6 +469,7 @@ fun AudioPlayerScreen(viewModel: MainViewModel) {
             item {
                 Row(
                     modifier = Modifier
+                        .widthIn(max = 640.dp)
                         .fillMaxWidth()
                         .padding(top = VennelaTokens.spaceLg),
                     verticalAlignment = Alignment.CenterVertically
@@ -474,12 +488,14 @@ fun AudioPlayerScreen(viewModel: MainViewModel) {
                             "Sleep timer"
                         },
                         color = if (sleepRemainingSeconds > 0) accent.secondary else palette.textSecondary,
+                        fontFamily = if (sleepRemainingSeconds > 0) VennelaFonts.Mono else VennelaFonts.Sans,
                         fontSize = VennelaTokens.micro,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
                 LazyRow(
                     modifier = Modifier
+                        .widthIn(max = 640.dp)
                         .fillMaxWidth()
                         .padding(top = VennelaTokens.spaceSm),
                     horizontalArrangement = Arrangement.spacedBy(VennelaTokens.spaceSm),
@@ -510,6 +526,7 @@ fun AudioPlayerScreen(viewModel: MainViewModel) {
                     label = if (queue.isEmpty()) "No queue in this folder" else "Queue • ${queue.size} tracks",
                     icon = Icons.AutoMirrored.Filled.PlaylistPlay,
                     enabled = queue.isNotEmpty(),
+                    modifier = Modifier.widthIn(max = 640.dp).testTag("audio_queue_cta_button"),
                     onClick = { showQueue = true }
                 )
                 Spacer(modifier = Modifier.height(VennelaTokens.spaceSm))
@@ -782,6 +799,7 @@ private fun TransportLozenge(
 
     Row(
         modifier = Modifier
+            .widthIn(max = 640.dp)
             .fillMaxWidth()
             .padding(top = VennelaTokens.spaceLg)
             .liquidGlass(spec, RoundedCornerShape(VennelaTokens.radiusPill))
@@ -793,6 +811,7 @@ private fun TransportLozenge(
             icon = Icons.Default.Shuffle,
             contentDescription = if (shuffle) "Shuffle on" else "Shuffle off",
             tint = if (shuffle) activeTint else palette.textTertiary,
+            modifier = Modifier.testTag("audio_shuffle_button"),
             onClick = onShuffle
         )
         LozengeIcon(
@@ -800,6 +819,7 @@ private fun TransportLozenge(
             contentDescription = "Previous track",
             tint = palette.textPrimary,
             iconSize = 30.dp,
+            modifier = Modifier.testTag("audio_prev_button"),
             onClick = onPrevious
         )
 
@@ -812,6 +832,7 @@ private fun TransportLozenge(
         Box(
             modifier = Modifier
                 .size(68.dp)
+                .testTag("audio_play_pause_button")
                 .graphicsLayer {
                     scaleX = playScale
                     scaleY = playScale
@@ -846,18 +867,21 @@ private fun TransportLozenge(
             contentDescription = "Next track",
             tint = palette.textPrimary,
             iconSize = 30.dp,
+            modifier = Modifier.testTag("audio_next_button"),
             onClick = onNext
         )
         LozengeIcon(
             icon = if (repeatOne) Icons.Default.RepeatOne else Icons.Default.Repeat,
             contentDescription = if (repeatOne) "Repeat one on" else "Repeat off",
             tint = if (repeatOne) activeTint else palette.textTertiary,
+            modifier = Modifier.testTag("audio_repeat_button"),
             onClick = onRepeat
         )
         LozengeIcon(
             icon = Icons.AutoMirrored.Filled.PlaylistPlay,
             contentDescription = "Open queue",
             tint = palette.textSecondary,
+            modifier = Modifier.testTag("audio_queue_button"),
             onClick = onOpenQueue
         )
     }
@@ -869,10 +893,11 @@ private fun LozengeIcon(
     contentDescription: String,
     tint: Color,
     iconSize: androidx.compose.ui.unit.Dp = VennelaTokens.iconLg,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(VennelaTokens.touchTargetMin)
             .clip(CircleShape)
             .clickable(onClick = onClick),
@@ -911,6 +936,7 @@ private fun QueueSheet(
 
     GlassPanel(
         modifier = Modifier
+            .widthIn(max = 640.dp)
             .fillMaxWidth()
             .heightIn(max = 460.dp)
             .padding(horizontal = VennelaTokens.spaceSm),

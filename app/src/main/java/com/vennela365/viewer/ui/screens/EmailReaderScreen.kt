@@ -50,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -60,6 +61,7 @@ import com.vennela365.viewer.registry.FormatRegistry
 import com.vennela365.viewer.storage.ShareUri
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.theme.liquidGlass
 import com.vennela365.viewer.theme.liquidGlassSpec
@@ -354,7 +356,8 @@ fun EmailReaderScreen(viewModel: MainViewModel) {
                     .padding(horizontal = VennelaTokens.gutter)
                     // Chrome floats over the page: only a slim top inset, with the
                     // bottom breathing room living inside the scroll content.
-                    .padding(top = VennelaTokens.viewerTopInset)
+                    .padding(top = VennelaTokens.viewerTopInset),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 when {
                     file == null -> Box(
@@ -490,12 +493,14 @@ fun EmailReaderScreen(viewModel: MainViewModel) {
                     ReaderIconButton(
                         icon = Icons.Default.Share,
                         contentDescription = "Share this message",
+                        modifier = Modifier.testTag("mail_share_button"),
                         onClick = { shareMessage() }
                     )
                     Spacer(modifier = Modifier.width(VennelaTokens.spaceXs))
                     ReaderIconButton(
                         icon = Icons.AutoMirrored.Filled.OpenInNew,
                         contentDescription = "Open this message in another app",
+                        modifier = Modifier.testTag("mail_open_with_button"),
                         onClick = { openWithMessage() }
                     )
                 }
@@ -517,11 +522,13 @@ fun EmailReaderScreen(viewModel: MainViewModel) {
                     ReaderIconButton(
                         icon = Icons.Default.ContentCopy,
                         contentDescription = "Copy message body",
+                        modifier = Modifier.testTag("mail_copy_button"),
                         onClick = { copyBody() }
                     )
                     ReaderIconButton(
                         icon = Icons.Default.Info,
                         contentDescription = "Message details",
+                        modifier = Modifier.testTag("mail_details_button"),
                         active = isDetailsOpen,
                         onClick = {
                             isDetailsOpen = !isDetailsOpen
@@ -582,6 +589,7 @@ private fun MailHeaderCard(
     val palette = LocalVennelaPalette.current
     Column(
         modifier = Modifier
+            .widthIn(max = 720.dp)
             .fillMaxWidth()
             .clip(RoundedCornerShape(VennelaTokens.radiusCard))
             .background(palette.cardSurface)
@@ -591,7 +599,9 @@ private fun MailHeaderCard(
         Text(
             text = subject,
             color = palette.textPrimary,
-            fontSize = VennelaTokens.titleMedium,
+            fontFamily = VennelaFonts.Serif,
+            fontSize = 21.sp,
+            lineHeight = 27.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = (-0.2).sp,
             maxLines = 3,
@@ -667,6 +677,7 @@ private fun MailAttachmentSection(
     val accent = LocalVennelaAccent.current
     Column(
         modifier = Modifier
+            .widthIn(max = 720.dp)
             .fillMaxWidth()
             .clip(RoundedCornerShape(VennelaTokens.radiusCard))
             .background(palette.cardSurface)
@@ -726,6 +737,7 @@ private fun MailAttachmentSection(
                     Text(
                         text = mailAttachmentDetail(attachment),
                         color = palette.textTertiary,
+                        fontFamily = VennelaFonts.Mono,
                         fontSize = VennelaTokens.nano,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis

@@ -22,6 +22,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -51,8 +52,11 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -62,17 +66,23 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.ListAlt
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.RotateRight
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FitScreen
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Print
@@ -83,7 +93,6 @@ import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
@@ -115,6 +124,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -124,6 +134,7 @@ import com.vennela365.viewer.storage.ShareUri
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
 import com.vennela365.viewer.theme.LiquidMotion
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.theme.ViewerColorMode
 import com.vennela365.viewer.theme.applyViewerColorMode
@@ -133,16 +144,28 @@ import com.vennela365.viewer.ui.components.GlassDivider
 import com.vennela365.viewer.ui.components.GlassListRow
 import com.vennela365.viewer.ui.components.GlassPanel
 import com.vennela365.viewer.ui.components.HyperGutterRadar
+import com.vennela365.viewer.ui.components.LiquidButton
 import com.vennela365.viewer.ui.components.LiquidChip
 import com.vennela365.viewer.ui.components.LiquidPage
+import com.vennela365.viewer.ui.components.OkenScanFilter
 import com.vennela365.viewer.ui.components.ReaderIconButton
-import com.vennela365.viewer.ui.components.ReaderTopToolbar
+import com.vennela365.viewer.ui.components.SuiteStyleSwitcherStrip
+import com.vennela365.viewer.ui.components.ViewerGlassSheet
+import com.vennela365.viewer.ui.components.ViewerKind
+import com.vennela365.viewer.ui.components.ViewerSuiteStyle
 import com.vennela365.viewer.ui.components.ViewerTopBar
 import com.vennela365.viewer.ui.components.VennelaEmptyState
 import com.vennela365.viewer.ui.components.VennelaErrorState
+import com.vennela365.viewer.ui.components.WpsPaperTone
 import com.vennela365.viewer.ui.components.pressScale
+import com.vennela365.viewer.ui.components.rememberSuiteSessionState
 import com.vennela365.viewer.viewmodel.MainViewModel
 import com.vennela365.viewer.viewmodel.Screen
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -187,21 +210,27 @@ private enum class PdfPanel(val label: String) {
 }
 
 /**
- * Document-level parse cache. Page counts and rendered thumbnails survive the
- * screen leaving composition, so reopening the same PDF paints its real page
- * indicator and thumbnails on the first frame instead of re-rendering.
+ * Document-level parse cache. Page counts, continuous-scroll bitmaps, and rendered
+ * thumbnails survive the screen leaving composition, so reopening the same PDF paints
+ * its real page indicator and thumbnails on the first frame instead of re-rendering.
  */
-private object PdfProCache {
+internal object PdfProCache {
     private const val MaxThumbs = 32
+    private const val MaxPages = 10
     private val pageCounts = ConcurrentHashMap<String, Int>()
     private val thumbs = object : LinkedHashMap<String, Bitmap>(16, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Bitmap>) = size > MaxThumbs
+    }
+    private val pages = object : LinkedHashMap<String, Bitmap>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Bitmap>) = size > MaxPages
     }
 
     fun pageCount(fileKey: String): Int = pageCounts[fileKey] ?: 0
     fun putPageCount(fileKey: String, count: Int) { if (count > 0) pageCounts[fileKey] = count }
     @Synchronized fun thumb(key: String): Bitmap? = thumbs[key]?.takeIf { !it.isRecycled }
     @Synchronized fun putThumb(key: String, bitmap: Bitmap) { thumbs[key] = bitmap }
+    @Synchronized fun page(key: String): Bitmap? = pages[key]?.takeIf { !it.isRecycled }
+    @Synchronized fun putPage(key: String, bitmap: Bitmap) { pages[key] = bitmap }
 }
 
 /** Per-file reading position, so reopening a PDF lands where you left it. */
@@ -282,17 +311,12 @@ private class PdfPrintAdapter(private val source: File, private val jobName: Str
 }
 
 /**
- * PDF viewer.
+ * Pro PDF Studio & Universal PDF Viewer.
  *
- * Hierarchy follows `Screens/9.pdf_viewer.png`: frosted toolbar with a real page
- * indicator, the rendered page on a paper bed, a page-thumbnail rail and a
- * frosted bottom tool bar — extended with a pro layer: quick find, page jump
- * with a real scrubber, outline drawer, zoom presets, reading display modes,
- * keep-screen-on, per-file reading position, share / open-with / print and a
- * metadata panel that reports only real values.
- *
- * The `PdfRenderer` pipeline (page clamping, bitmap sizing, recycling, export)
- * is preserved exactly as it was.
+ * Supports 4 real viewing modes (Single Page, Continuous Vertical Scroll, 2-Page Spread,
+ * and Apple Books-style Reflow Reader), Live Vector Ink & Highlighter Markup with flattened
+ * multi-page PDF export, Offline Neural TTS Read-Aloud, Page Bookmarking, Quick Find,
+ * Page Grid, Print Spooling, and a 1-tap built-in 5-Page Showcase PDF generator.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -300,9 +324,11 @@ fun PdfViewerScreen(viewModel: MainViewModel) {
     val selectedFile by viewModel.selectedFile.collectAsState()
     val extractedText by viewModel.documentText.collectAsState()
     val viewerColorMode by viewModel.viewerColorMode.collectAsState()
+    val activeSuite by viewModel.preferredSuiteStyle.collectAsState()
     val context = LocalContext.current
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
+    val suiteSession = rememberSuiteSessionState(activeSuite, palette.isDark)
     val scope = rememberCoroutineScope()
     val pageInsetPx = with(LocalDensity.current) { VennelaTokens.spaceSm.toPx() }
     val fileKey = selectedFile?.id ?: "no-pdf"
@@ -311,9 +337,36 @@ fun PdfViewerScreen(viewModel: MainViewModel) {
     var page by rememberSaveable(fileKey) { mutableStateOf(PdfReadingMemory.page(fileKey)) }
     var reloadKey by remember(fileKey) { mutableIntStateOf(0) }
 
+    // Pro PDF Studio state: view mode, markup studio, voice reader, bookmarks
+    var viewMode by rememberSaveable(fileKey) { mutableStateOf(PdfViewMode.SINGLE_PAGE) }
+    var showMarkupBar by rememberSaveable(fileKey) { mutableStateOf(false) }
+    var isHighlighter by rememberSaveable { mutableStateOf(false) }
+    var activeInkColorIndex by rememberSaveable { mutableIntStateOf(0) }
+    var strokeScale by rememberSaveable { mutableFloatStateOf(1.0f) }
+    var annotationEpoch by remember { mutableIntStateOf(0) }
+    var showTtsBar by rememberSaveable(fileKey) { mutableStateOf(false) }
+
+    val activeInkColor = PdfMarkupColors.getOrElse(activeInkColorIndex) { PdfMarkupColors.first() }
+    val currentPageStrokes = remember(fileKey, page, annotationEpoch) {
+        PdfAnnotationMemory.strokes(fileKey, page)
+    }
+    val isCurrentPageBookmarked = remember(fileKey, page, annotationEpoch) {
+        PdfBookmarkMemory.isBookmarked(fileKey, page)
+    }
+    val bookmarkedPages = remember(fileKey, annotationEpoch) {
+        PdfBookmarkMemory.bookmarkedPages(fileKey)
+    }
+
     var showThumbRail by remember { mutableStateOf(true) }
     var panel by remember { mutableStateOf(PdfPanel.NONE) }
     var showTocSheet by remember { mutableStateOf(false) }
+    var showGridSheet by remember { mutableStateOf(false) }
+    var rotationDegrees by rememberSaveable(fileKey) { mutableIntStateOf(0) }
+    val animatedRotation by animateFloatAsState(
+        targetValue = rotationDegrees.toFloat(),
+        animationSpec = LiquidMotion.liquid(),
+        label = "pdfRotation"
+    )
     var jumpPageInput by remember { mutableStateOf("") }
     var showFindBar by remember { mutableStateOf(false) }
     var findQuery by remember { mutableStateOf("") }
@@ -367,12 +420,14 @@ fun PdfViewerScreen(viewModel: MainViewModel) {
     var scale by remember(fileKey) { mutableFloatStateOf(PdfReadingMemory.zoom(fileKey)) }
     var offset by remember(fileKey) { mutableStateOf(Offset.Zero) }
     val transformState = rememberTransformableState { zoomChange, panChange, _ ->
-        scale = (scale * zoomChange).coerceIn(PdfMinZoom, PdfMaxZoom)
-        offset = if (scale <= 1.01f) Offset.Zero else offset + panChange
+        if (!showMarkupBar) {
+            scale = (scale * zoomChange).coerceIn(PdfMinZoom, PdfMaxZoom)
+            offset = if (scale <= 1.01f) Offset.Zero else offset + panChange
+        }
     }
 
     val dragX = remember(fileKey) { Animatable(0f) }
-    val pagingEnabled = scale <= 1.01f
+    val pagingEnabled = scale <= 1.01f && !showMarkupBar && viewMode == PdfViewMode.SINGLE_PAGE
     val stripState = rememberLazyListState()
     val thumbCache = remember(fileKey) { ConcurrentHashMap<Int, Bitmap>() }
 
@@ -384,7 +439,6 @@ fun PdfViewerScreen(viewModel: MainViewModel) {
     LaunchedEffect(fileKey, page) { PdfReadingMemory.putPage(fileKey, page) }
     LaunchedEffect(fileKey, scale) { PdfReadingMemory.putZoom(fileKey, scale) }
 
-    // Real "fit width" needs the laid-out viewport and the true page aspect.
     val pageAspect = if (rendered.pageHeight > 0) rendered.pageWidth.toFloat() / rendered.pageHeight else 0f
     val innerWidth = (viewportWidth - pageInsetPx * 2f).coerceAtLeast(1f)
     val innerHeight = (viewportHeight - pageInsetPx * 2f).coerceAtLeast(1f)
@@ -415,16 +469,29 @@ fun PdfViewerScreen(viewModel: MainViewModel) {
         }
     }
 
-    // Quick find corpus. PdfRenderer exposes no text API, so the only honest
-    // text corpus is the extractor's output — and only while it reads as text
-    // rather than as a compressed binary stream.
-    val searchableText = remember(extractedText) {
-        val candidate = extractedText
-        if (candidate.length < 24) {
-            ""
+    val isShowcasePdf = selectedFile?.name?.contains("Vennela_365_Pro_Studio_Guide", ignoreCase = true) == true
+    val pageTextsForReflow: List<String> = remember(isShowcasePdf, extractedText, rendered.pageCount) {
+        if (isShowcasePdf) {
+            ShowcasePdfPageTexts
+        } else if (extractedText.isNotBlank() && rendered.pageCount > 0) {
+            val chunkSize = (extractedText.length / rendered.pageCount.coerceAtLeast(1)).coerceAtLeast(200)
+            extractedText.chunked(chunkSize)
         } else {
-            val readable = candidate.count { it.isLetterOrDigit() || it.isWhitespace() }
-            if (readable.toFloat() / candidate.length >= 0.90f) candidate.take(PdfMaxTextProbe) else ""
+            emptyList()
+        }
+    }
+
+    val searchableText = remember(extractedText, isShowcasePdf) {
+        if (isShowcasePdf) {
+            ShowcasePdfPageTexts.joinToString("\n\n")
+        } else {
+            val candidate = extractedText
+            if (candidate.length < 24) {
+                ""
+            } else {
+                val readable = candidate.count { it.isLetterOrDigit() || it.isWhitespace() }
+                if (readable.toFloat() / candidate.length >= 0.90f) candidate.take(PdfMaxTextProbe) else ""
+            }
         }
     }
 
@@ -467,7 +534,6 @@ fun PdfViewerScreen(viewModel: MainViewModel) {
     val safeFindIndex = if (findHits.isEmpty()) 0 else findIndex.coerceIn(0, findHits.lastIndex)
     val activeHit = findHits.getOrNull(safeFindIndex)
 
-    // Selecting a page hit really turns the page; the rail highlight follows it.
     LaunchedEffect(activeHit, showFindBar) {
         val target = activeHit?.pageIndex
         if (showFindBar && target != null && target != page) goToPage(target, resetZoom = false)
@@ -476,6 +542,47 @@ fun PdfViewerScreen(viewModel: MainViewModel) {
     val mime = selectedFile?.formatInfo?.mimeType?.takeIf { it.isNotBlank() } ?: "application/pdf"
 
     fun toast(message: String) = Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+
+    fun launchShowcasePdf() {
+        scope.launch {
+            val generated = withContext(Dispatchers.IO) {
+                runCatching { generateShowcasePdf(context) }.getOrNull()
+            }
+            if (generated != null && generated.exists()) {
+                viewModel.openUri(Uri.fromFile(generated), generated.name)
+            } else {
+                toast("Could not generate showcase PDF")
+            }
+        }
+    }
+
+    fun exportAndShareAnnotatedPdf() {
+        val uri = selectedFile?.uri ?: return toast("No PDF open to export")
+        scope.launch {
+            toast("Flattening annotations into PDF…")
+            val exported = withContext(Dispatchers.IO) {
+                exportAnnotatedPdf(
+                    context = context,
+                    sourceUri = uri,
+                    fileKey = fileKey,
+                    baseFileName = selectedFile?.name ?: "document.pdf"
+                )
+            }
+            if (exported == null || !exported.exists()) {
+                return@launch toast("Could not export annotated PDF")
+            }
+            val intent = Intent(Intent.ACTION_SEND).apply { type = "application/pdf" }
+            if (ShareUri.attachStream(context, intent, Uri.fromFile(exported))) {
+                runCatching {
+                    context.startActivity(Intent.createChooser(intent, "Share ${exported.name}"))
+                }.onFailure {
+                    viewModel.openUri(Uri.fromFile(exported), exported.name)
+                }
+            } else {
+                viewModel.openUri(Uri.fromFile(exported), exported.name)
+            }
+        }
+    }
 
     fun shareFile() {
         val uri = selectedFile?.uri ?: return toast("There is no file to share")
@@ -555,7 +662,23 @@ fun PdfViewerScreen(viewModel: MainViewModel) {
         PdfChip("Zoom in", Icons.Default.ZoomIn) { animateZoom(scale + 0.25f) }
     )
     val toolChips = listOf(
-        PdfChip("Outline", Icons.AutoMirrored.Filled.ListAlt) { showTocSheet = true },
+        PdfChip("Markup Studio", Icons.Default.Edit, showMarkupBar) {
+            showMarkupBar = !showMarkupBar
+            if (showMarkupBar) viewMode = PdfViewMode.SINGLE_PAGE
+        },
+        PdfChip("Voice Read-Aloud", Icons.AutoMirrored.Filled.VolumeUp, showTtsBar) {
+            showTtsBar = !showTtsBar
+        },
+        PdfChip("Bookmark Page", Icons.Default.Bookmark, isCurrentPageBookmarked) {
+            PdfBookmarkMemory.toggle(fileKey, page)
+            annotationEpoch++
+        },
+        PdfChip("Page grid", Icons.Default.GridView) { showGridSheet = true },
+        PdfChip("Rotate 90°", Icons.AutoMirrored.Filled.RotateRight, rotationDegrees % 360 != 0) {
+            rotationDegrees += 90
+        },
+        PdfChip("Outline & Bookmarks", Icons.AutoMirrored.Filled.ListAlt) { showTocSheet = true },
+        PdfChip("Save Annotated PDF", Icons.Default.Share) { exportAndShareAnnotatedPdf() },
         PdfChip("Full search screen", Icons.Default.Search) { viewModel.navigateTo(Screen.PdfSearch) },
         PdfChip("Thumbnails", Icons.Default.GridView, showThumbRail) { showThumbRail = !showThumbRail },
         PdfChip("Jump to page", Icons.AutoMirrored.Filled.ListAlt, panel == PdfPanel.JUMP) { panel = PdfPanel.JUMP },
@@ -565,8 +688,12 @@ fun PdfViewerScreen(viewModel: MainViewModel) {
         PdfChip("Share this page", Icons.Default.Share) { shareCurrentPage() },
         PdfChip("Open with", Icons.AutoMirrored.Filled.OpenInNew) { openWith() },
         PdfChip("Print", Icons.Default.Print) { printDocument() },
+        PdfChip("Load Showcase PDF", Icons.Default.AutoAwesome) { launchShowcasePdf() },
         PdfChip("Metadata screen", Icons.Default.Info) { viewModel.navigateTo(Screen.FileMetadata) }
     )
+    val annotatedPageCount = remember(fileKey, rendered.pageCount, annotationEpoch) {
+        PdfAnnotationMemory.totalAnnotatedPages(fileKey, rendered.pageCount)
+    }
     val infoRows = listOf(
         "Name" to (selectedFile?.name ?: "No file open"),
         "Size" to (selectedFile?.formattedSize ?: "Unknown"),
@@ -575,6 +702,8 @@ fun PdfViewerScreen(viewModel: MainViewModel) {
         "Extension" to (selectedFile?.extension?.uppercase()?.ifBlank { "none" } ?: "Unknown"),
         "Pages" to if (rendered.pageCount > 0) "${rendered.pageCount} pages" else "Still reading the page tree…",
         "Page box" to if (rendered.pageWidth > 0) "${rendered.pageWidth} × ${rendered.pageHeight} px" else "Not rendered yet",
+        "View mode" to "${viewMode.label} • ${viewerColorMode.title}",
+        "Bookmarks & Markup" to "${bookmarkedPages.size} bookmarked • $annotatedPageCount annotated",
         "Reading position" to "Page ${page + 1} at ${(scale * 100).roundToInt()}%"
     )
 
@@ -582,9 +711,70 @@ fun PdfViewerScreen(viewModel: MainViewModel) {
         modifier = Modifier.fillMaxSize(),
         title = null,
         dock = {
-            Column(Modifier.fillMaxWidth().padding(horizontal = VennelaTokens.gutter)) {
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = VennelaTokens.gutter),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(VennelaTokens.spaceXs)
+            ) {
+                // Live Voice Read-Aloud TTS bar
+                AnimatedVisibility(
+                    visible = showTtsBar && rendered.pageCount > 0,
+                    enter = fadeIn(LiquidMotion.glide()) + expandVertically(LiquidMotion.liquid()),
+                    exit = fadeOut(LiquidMotion.exit()) + shrinkVertically(LiquidMotion.exit())
+                ) {
+                    val ttsText = pageTextsForReflow.getOrNull(page)
+                        ?.takeIf { it.isNotBlank() }
+                        ?: searchableText.ifBlank {
+                            "Vennela 365 PDF Studio. Page ${page + 1} of ${rendered.pageCount} in ${selectedFile?.name ?: "document"}."
+                        }
+                    PdfTtsControllerBar(
+                        textToSpeak = ttsText,
+                        pageLabel = "Page ${page + 1} of ${rendered.pageCount}",
+                        onClose = { showTtsBar = false }
+                    )
+                }
+
+                // Live iOS 26 Markup Studio bar
+                AnimatedVisibility(
+                    visible = showMarkupBar && rendered.pageCount > 0,
+                    enter = fadeIn(LiquidMotion.glide()) + expandVertically(LiquidMotion.liquid()),
+                    exit = fadeOut(LiquidMotion.exit()) + shrinkVertically(LiquidMotion.exit())
+                ) {
+                    PdfMarkupToolbar(
+                        isHighlighter = isHighlighter,
+                        onSelectTool = { isHighlighter = it },
+                        activeColor = activeInkColor,
+                        onSelectColor = { chosen ->
+                            val idx = PdfMarkupColors.indexOfFirst { it == chosen }
+                            if (idx >= 0) activeInkColorIndex = idx
+                        },
+                        strokeScale = strokeScale,
+                        onCycleStrokeScale = {
+                            strokeScale = when {
+                                strokeScale <= 0.8f -> 1.0f
+                                strokeScale <= 1.2f -> 1.6f
+                                else -> 0.7f
+                            }
+                        },
+                        canUndo = currentPageStrokes.isNotEmpty(),
+                        onUndo = {
+                            if (PdfAnnotationMemory.undo(fileKey, page)) annotationEpoch++
+                        },
+                        canRedo = true,
+                        onRedo = {
+                            if (PdfAnnotationMemory.redo(fileKey, page)) annotationEpoch++
+                        },
+                        onClearPage = {
+                            PdfAnnotationMemory.clearPage(fileKey, page)
+                            annotationEpoch++
+                        },
+                        onExportAnnotatedPdf = { exportAndShareAnnotatedPdf() },
+                        onClose = { showMarkupBar = false }
+                    )
+                }
+
                 PdfTray(
-                    visible = showThumbRail && rendered.pageCount > 0,
+                    visible = showThumbRail && rendered.pageCount > 0 && !showMarkupBar && viewMode == PdfViewMode.SINGLE_PAGE,
                     innerPadding = PaddingValues(vertical = VennelaTokens.spaceSm)
                 ) {
                     Row(
@@ -593,12 +783,15 @@ fun PdfViewerScreen(viewModel: MainViewModel) {
                     ) {
                         Text(
                             "Pages", color = palette.textPrimary,
+                            fontFamily = VennelaFonts.Sans,
                             fontSize = VennelaTokens.caption, fontWeight = FontWeight.Bold,
                             modifier = Modifier.weight(1f)
                         )
                         Text(
                             "Page ${page + 1} of ${rendered.pageCount}",
-                            color = palette.textSecondary, fontSize = VennelaTokens.micro
+                            color = palette.textSecondary,
+                            fontFamily = VennelaFonts.Mono,
+                            fontSize = VennelaTokens.micro
                         )
                     }
                     Spacer(Modifier.height(VennelaTokens.spaceSm))
@@ -702,12 +895,27 @@ fun PdfViewerScreen(viewModel: MainViewModel) {
 
                         PdfPanel.VIEW -> {
                             Text(
-                                "Display mode — ${viewerColorMode.title}",
+                                "Layout mode — ${viewMode.label}",
                                 color = palette.textPrimary,
                                 fontSize = VennelaTokens.caption,
                                 fontWeight = FontWeight.Bold
                             )
+                            Spacer(Modifier.height(VennelaTokens.spaceXs))
+                            ChipRail(
+                                PdfViewMode.entries.map { mode ->
+                                    PdfChip(mode.label, mode.icon, viewMode == mode) {
+                                        viewMode = mode
+                                    }
+                                }
+                            )
                             Spacer(Modifier.height(VennelaTokens.spaceSm))
+                            Text(
+                                "Display filter — ${viewerColorMode.title}",
+                                color = palette.textPrimary,
+                                fontSize = VennelaTokens.caption,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(Modifier.height(VennelaTokens.spaceXs))
                             ChipRail(
                                 PdfDisplayMode.entries.map { mode ->
                                     PdfChip(mode.label, mode.icon, viewerColorMode == mode.mode) {
@@ -739,10 +947,13 @@ fun PdfViewerScreen(viewModel: MainViewModel) {
                 val dockSpec = liquidGlassSpec(
                     alpha = 0.32f,
                     frost = VennelaTokens.frostHeavy,
-                    elevation = VennelaTokens.elevationDock
+                    elevation = VennelaTokens.elevationDock,
+                    strong = true
                 )
                 Row(
-                    Modifier.fillMaxWidth()
+                    Modifier
+                        .widthIn(max = 620.dp)
+                        .fillMaxWidth()
                         .liquidGlass(dockSpec, RoundedCornerShape(VennelaTokens.radiusDock))
                         .padding(horizontal = VennelaTokens.spaceXs, vertical = VennelaTokens.spaceXxs),
                     verticalAlignment = Alignment.CenterVertically,
@@ -750,44 +961,63 @@ fun PdfViewerScreen(viewModel: MainViewModel) {
                 ) {
                     GlassRoundAction(
                         Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Previous page",
-                        enabled = page > 0
+                        enabled = page > 0,
+                        modifier = Modifier.testTag("pdf_prev_button")
                     ) { goTo(page - 1) }
 
                     Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                        PageIndicatorPill("${page + 1} / ${rendered.pageCount.coerceAtLeast(1)}") {
+                        PageIndicatorPill(
+                            label = "${page + 1} / ${rendered.pageCount.coerceAtLeast(1)}",
+                            modifier = Modifier.testTag("pdf_page_pill")
+                        ) {
                             panel = if (panel == PdfPanel.JUMP) PdfPanel.NONE else PdfPanel.JUMP
                         }
                     }
 
                     GlassRoundAction(
                         Icons.AutoMirrored.Filled.KeyboardArrowRight, "Next page",
-                        enabled = page < rendered.pageCount - 1
+                        enabled = page < rendered.pageCount - 1,
+                        modifier = Modifier.testTag("pdf_next_button")
                     ) { goTo(page + 1) }
 
-                    GlassRoundAction(Icons.Default.Search, "Quick find", active = showFindBar) {
+                    GlassRoundAction(
+                        Icons.Default.Edit, "Markup studio",
+                        active = showMarkupBar,
+                        modifier = Modifier.testTag("pdf_markup_button")
+                    ) {
+                        showMarkupBar = !showMarkupBar
+                        if (showMarkupBar) viewMode = PdfViewMode.SINGLE_PAGE
+                    }
+
+                    GlassRoundAction(
+                        Icons.Default.Search, "Quick find",
+                        active = showFindBar,
+                        modifier = Modifier.testTag("pdf_find_button")
+                    ) {
                         showFindBar = !showFindBar
                         if (!showFindBar) findQuery = ""
                     }
                     GlassRoundAction(
                         Icons.Default.ZoomIn, "Zoom controls",
-                        active = panel == PdfPanel.ZOOM
+                        active = panel == PdfPanel.ZOOM,
+                        modifier = Modifier.testTag("pdf_zoom_button")
                     ) { panel = if (panel == PdfPanel.ZOOM) PdfPanel.NONE else PdfPanel.ZOOM }
                     GlassRoundAction(
                         Icons.Default.MoreHoriz, "More tools",
-                        active = panel == PdfPanel.VIEW || panel == PdfPanel.INFO
+                        active = panel == PdfPanel.VIEW || panel == PdfPanel.INFO,
+                        modifier = Modifier.testTag("pdf_more_button")
                     ) { panel = if (panel == PdfPanel.VIEW) PdfPanel.NONE else PdfPanel.VIEW }
                 }
             }
         }
     ) { padding ->
         Box(Modifier.fillMaxSize()) {
-            // Floating, slim toolbar — the page gets the whole screen.
             ViewerTopBar(
-                title = selectedFile?.name ?: "PDF viewer",
+                title = selectedFile?.name ?: "Pro PDF Studio",
                 subtitle = buildString {
-                    append("PDF")
+                    append(viewMode.label)
                     if (rendered.pageCount > 0) append(" • ${rendered.pageCount} pages")
-                    append(" • ${(scale * 100).roundToInt()}%")
+                    if (viewMode == PdfViewMode.SINGLE_PAGE) append(" • ${(scale * 100).roundToInt()}%")
                 },
                 onBack = { viewModel.navigateBack() },
                 modifier = Modifier,
@@ -799,10 +1029,41 @@ fun PdfViewerScreen(viewModel: MainViewModel) {
             ) {
                 if (rendered.pageCount > 0) {
                     ReaderIconButton(
-                        icon = Icons.AutoMirrored.Filled.ListAlt,
-                        contentDescription = "Jump to page",
-                        active = panel == PdfPanel.JUMP,
-                        onClick = { panel = if (panel == PdfPanel.JUMP) PdfPanel.NONE else PdfPanel.JUMP }
+                        icon = viewMode.icon,
+                        contentDescription = "Cycle layout mode (${viewMode.label})",
+                        active = viewMode != PdfViewMode.SINGLE_PAGE,
+                        modifier = Modifier.testTag("pdf_view_mode_button"),
+                        onClick = {
+                            val modes = PdfViewMode.entries
+                            viewMode = modes[(modes.indexOf(viewMode) + 1) % modes.size]
+                        }
+                    )
+                    Spacer(Modifier.width(VennelaTokens.spaceXs))
+                    ReaderIconButton(
+                        icon = if (isCurrentPageBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                        contentDescription = if (isCurrentPageBookmarked) "Remove bookmark" else "Bookmark page",
+                        active = isCurrentPageBookmarked,
+                        modifier = Modifier.testTag("pdf_bookmark_button"),
+                        onClick = {
+                            PdfBookmarkMemory.toggle(fileKey, page)
+                            annotationEpoch++
+                        }
+                    )
+                    Spacer(Modifier.width(VennelaTokens.spaceXs))
+                    ReaderIconButton(
+                        icon = Icons.Default.GridView,
+                        contentDescription = "Page grid overview",
+                        active = showGridSheet,
+                        modifier = Modifier.testTag("pdf_grid_button"),
+                        onClick = { showGridSheet = true }
+                    )
+                    Spacer(Modifier.width(VennelaTokens.spaceXs))
+                    ReaderIconButton(
+                        icon = Icons.AutoMirrored.Filled.RotateRight,
+                        contentDescription = "Rotate page 90 degrees",
+                        active = rotationDegrees % 360 != 0,
+                        modifier = Modifier.testTag("pdf_rotate_button"),
+                        onClick = { rotationDegrees += 90 }
                     )
                     Spacer(Modifier.width(VennelaTokens.spaceXs))
                 }
@@ -823,245 +1084,507 @@ fun PdfViewerScreen(viewModel: MainViewModel) {
                 )
             }
 
-            Box(
-                Modifier.fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = VennelaTokens.spaceXs)
-                    .padding(top = VennelaTokens.viewerTopInset)
-            ) {
-            Box(
-                Modifier.fillMaxSize()
-                    .applyViewerColorMode(viewerColorMode)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(palette.backgroundBottom)
-                    .border(1.dp, accent.secondary.copy(alpha = 0.16f), RoundedCornerShape(10.dp))
-                    .onSizeChanged { size ->
-                        viewportWidth = size.width.toFloat()
-                        viewportHeight = size.height.toFloat()
-                    }
-                    .pointerInput(page, pagingEnabled) {
-                        if (!pagingEnabled) return@pointerInput
-                        detectHorizontalDragGestures(
-                            onHorizontalDrag = { change, amount ->
-                                change.consume()
-                                scope.launch {
-                                    dragX.snapTo(
-                                        (dragX.value + amount)
-                                            .coerceIn(-size.width.toFloat(), size.width.toFloat())
-                                    )
-                                }
-                            },
-                            onDragEnd = {
-                                val threshold = size.width * 0.22f
-                                when {
-                                    dragX.value <= -threshold && page < rendered.pageCount - 1 -> goTo(page + 1)
-                                    dragX.value >= threshold && page > 0 -> goTo(page - 1)
-                                    else -> scope.launch { dragX.animateTo(0f, LiquidMotion.liquid()) }
-                                }
-                            },
-                            onDragCancel = { scope.launch { dragX.animateTo(0f, LiquidMotion.liquid()) } }
-                        )
-                    }
-                    .pointerInput(Unit) {
-                        detectTapGestures(onDoubleTap = { animateZoom(if (scale > 1.01f) 1f else 2f) })
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                val bitmap = rendered.bitmap
+            val pdfColorFilter: ColorFilter? = remember(activeSuite, suiteSession.scanFilter, suiteSession.paperTone) {
                 when {
-                    selectedFile?.uri == null -> VennelaEmptyState(
-                        title = "No PDF open",
-                        hint = "Open a PDF from Files or Recents to read it here.",
-                        icon = Icons.Default.PictureAsPdf,
-                        actionLabel = "Browse files",
-                        onAction = { viewModel.navigateTo(Screen.FileExplorer) }
-                    )
-
-                    bitmap != null -> {
-                        Image(
-                            bitmap = bitmap.asImageBitmap(),
-                            contentDescription = "PDF page ${page + 1}",
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize()
-                                .padding(VennelaTokens.spaceSm)
-                                .graphicsLayer(
-                                    scaleX = scale,
-                                    scaleY = scale,
-                                    translationX = offset.x + dragX.value,
-                                    translationY = offset.y
+                    activeSuite == ViewerSuiteStyle.OKEN_SCANNER -> suiteSession.scanFilter.toColorFilter()
+                    activeSuite == ViewerSuiteStyle.WPS_SUPER && suiteSession.paperTone == WpsPaperTone.EYE_CARE_GREEN -> {
+                        // Gentle WPS Eye-Care Green paper matrix tint
+                        ColorFilter.colorMatrix(
+                            ColorMatrix(
+                                floatArrayOf(
+                                    0.78f, 0f, 0f, 0f, 0f,
+                                    0f, 0.93f, 0f, 0f, 0f,
+                                    0f, 0f, 0.80f, 0f, 0f,
+                                    0f, 0f, 0f, 1f, 0f
                                 )
-                                .transformable(transformState)
-                        )
-
-                        if (dragX.value != 0f) {
-                            OverlayPill {
-                                Text(
-                                    if (dragX.value < 0) "Next page →" else "← Previous page",
-                                    color = palette.textPrimary,
-                                    fontSize = VennelaTokens.micro,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-
-                        if (rendered.pageCount > 1) {
-                            HyperGutterRadar(
-                                ticks = emptyList(),
-                                currentScrollProgress = page.toFloat() /
-                                    (rendered.pageCount - 1).coerceAtLeast(1),
-                                onScrub = { fraction ->
-                                    goToPage(
-                                        (fraction * (rendered.pageCount - 1)).toInt()
-                                            .coerceIn(0, rendered.pageCount - 1),
-                                        resetZoom = false
-                                    )
-                                },
-                                formatPageOrLineLabel = { fraction ->
-                                    "Page " + ((fraction * (rendered.pageCount - 1)).toInt()
-                                        .coerceIn(0, rendered.pageCount - 1) + 1)
-                                },
-                                modifier = Modifier.align(Alignment.CenterEnd).fillMaxSize()
                             )
-                        }
-
-                        // The active quick-find result, highlighted over the page.
-                        if (showFindBar && activeHit != null) {
-                            OverlayPill(top = true) {
-                                Text(
-                                    "Match ${safeFindIndex + 1} of ${findHits.size} • ${activeHit.title}",
-                                    color = palette.textPrimary,
-                                    fontSize = VennelaTokens.micro,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
-
-                    rendered.error != null -> Box(Modifier.padding(VennelaTokens.spaceXl)) {
-                        VennelaErrorState(
-                            title = "This PDF could not be rendered",
-                            message = rendered.error ?: "Unknown rendering error",
-                            onRetry = { reloadKey++ },
-                            onDetails = { viewModel.navigateTo(Screen.FileMetadata) }
                         )
                     }
-
-                    else -> PdfGlassSkeleton(Modifier.fillMaxSize().padding(VennelaTokens.spaceXl))
-                }
-
-                if (showFindBar) {
-                    Column(
-                        Modifier.align(Alignment.TopCenter)
-                            .fillMaxWidth()
-                            .padding(horizontal = VennelaTokens.spaceSm),
-                        verticalArrangement = Arrangement.spacedBy(VennelaTokens.spaceSm)
-                    ) {
-                        PdfFindBar(
-                            query = findQuery,
-                            onQueryChange = { findQuery = it; findIndex = 0 },
-                            current = if (findHits.isEmpty()) 0 else safeFindIndex + 1,
-                            total = findHits.size,
-                            onPrevious = {
-                                if (findHits.isNotEmpty()) {
-                                    findIndex = (safeFindIndex - 1 + findHits.size) % findHits.size
-                                }
-                            },
-                            onNext = {
-                                if (findHits.isNotEmpty()) findIndex = (safeFindIndex + 1) % findHits.size
-                            },
-                            onClose = { showFindBar = false; findQuery = "" }
-                        )
-                        AnimatedVisibility(
-                            visible = findQuery.isNotBlank(),
-                            enter = fadeIn(LiquidMotion.glide()) + expandVertically(LiquidMotion.glide()),
-                            exit = fadeOut(LiquidMotion.exit()) + shrinkVertically(LiquidMotion.exit())
-                        ) {
-                            PdfFindResultsPanel(
-                                hits = findHits,
-                                activeIndex = safeFindIndex,
-                                hasTextLayer = searchableText.isNotEmpty(),
-                                pageCount = rendered.pageCount,
-                                onSelect = { index -> findIndex = index },
-                                onDismiss = { showFindBar = false; findQuery = "" }
-                            )
-                        }
-                    }
+                    else -> null
                 }
             }
+
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(top = VennelaTokens.viewerTopInset)
+            ) {
+                // Multi-Suite Switcher Strip + Active Suite Quick Controls for PDF
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = VennelaTokens.spaceSm, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SuiteStyleSwitcherStrip(
+                        activeSuite = activeSuite,
+                        onSelectSuite = { viewModel.setPreferredSuiteStyle(it) },
+                        isDark = palette.isDark,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                if (activeSuite == ViewerSuiteStyle.OKEN_SCANNER) {
+                    LazyRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = VennelaTokens.spaceSm, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(OkenScanFilter.entries.size) { idx ->
+                            val filter = OkenScanFilter.entries[idx]
+                            LiquidChip(
+                                text = filter.label,
+                                isActive = suiteSession.scanFilter == filter,
+                                onClick = { suiteSession.scanFilter = filter }
+                            )
+                        }
+                        item {
+                            LiquidChip(
+                                text = "Auto-Crop",
+                                isActive = suiteSession.showAutoCropHandles,
+                                onClick = { suiteSession.showAutoCropHandles = !suiteSession.showAutoCropHandles }
+                            )
+                        }
+                        item {
+                            LiquidChip(
+                                text = "Watermark",
+                                isActive = suiteSession.showSecurityWatermark,
+                                onClick = { suiteSession.showSecurityWatermark = !suiteSession.showSecurityWatermark }
+                            )
+                        }
+                        item {
+                            LiquidChip(
+                                text = "Official Stamp",
+                                isActive = suiteSession.showOfficialStamp,
+                                onClick = { suiteSession.showOfficialStamp = !suiteSession.showOfficialStamp }
+                            )
+                        }
+                    }
+                } else if (activeSuite == ViewerSuiteStyle.WPS_SUPER) {
+                    LazyRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = VennelaTokens.spaceSm, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(WpsPaperTone.entries.size) { idx ->
+                            val tone = WpsPaperTone.entries[idx]
+                            LiquidChip(
+                                text = tone.label,
+                                isActive = suiteSession.paperTone == tone,
+                                onClick = { suiteSession.paperTone = tone }
+                            )
+                        }
+                    }
+                }
+
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = VennelaTokens.spaceXs)
+                ) {
+                    Box(
+                        Modifier.fillMaxSize()
+                            .applyViewerColorMode(viewerColorMode)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(
+                                when (activeSuite) {
+                                    ViewerSuiteStyle.GOOGLE_WORKSPACE -> if (palette.isDark) Color(0xFF202124) else Color(0xFFF1F3F4)
+                                    ViewerSuiteStyle.MICROSOFT_365 -> if (palette.isDark) Color(0xFF1B1A19) else Color(0xFFEDEBE9)
+                                    ViewerSuiteStyle.WPS_SUPER -> if (suiteSession.paperTone == WpsPaperTone.EYE_CARE_GREEN) Color(0xFFDDF3E0) else palette.backgroundBottom
+                                    ViewerSuiteStyle.LIBRE_OFFICE -> if (palette.isDark) Color(0xFF202225) else Color(0xFFDADCE0)
+                                    ViewerSuiteStyle.OKEN_SCANNER -> Color(0xFF181C22)
+                                }
+                            )
+                            .border(0.75.dp, ViewerKind.PDF.accentFor(activeSuite).copy(alpha = 0.28f), RoundedCornerShape(14.dp))
+                            .onSizeChanged { size ->
+                                viewportWidth = size.width.toFloat()
+                                viewportHeight = size.height.toFloat()
+                            }
+                        .pointerInput(page, pagingEnabled) {
+                            if (!pagingEnabled) return@pointerInput
+                            detectHorizontalDragGestures(
+                                onHorizontalDrag = { change, amount ->
+                                    change.consume()
+                                    scope.launch {
+                                        dragX.snapTo(
+                                            (dragX.value + amount)
+                                                .coerceIn(-size.width.toFloat(), size.width.toFloat())
+                                        )
+                                    }
+                                },
+                                onDragEnd = {
+                                    val threshold = size.width * 0.22f
+                                    when {
+                                        dragX.value <= -threshold && page < rendered.pageCount - 1 -> goTo(page + 1)
+                                        dragX.value >= threshold && page > 0 -> goTo(page - 1)
+                                        else -> scope.launch { dragX.animateTo(0f, LiquidMotion.liquid()) }
+                                    }
+                                },
+                                onDragCancel = { scope.launch { dragX.animateTo(0f, LiquidMotion.liquid()) } }
+                            )
+                        }
+                        .pointerInput(showMarkupBar, viewMode) {
+                            if (showMarkupBar || viewMode != PdfViewMode.SINGLE_PAGE) return@pointerInput
+                            detectTapGestures(onDoubleTap = { animateZoom(if (scale > 1.01f) 1f else 2f) })
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    val bitmap = rendered.bitmap
+                    when {
+                        selectedFile?.uri == null -> Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(VennelaTokens.spaceMd),
+                            modifier = Modifier.padding(VennelaTokens.spaceXl)
+                        ) {
+                            VennelaEmptyState(
+                                title = "No PDF open",
+                                hint = "Open a PDF from Files or Recents, or launch the built-in 5-Page Pro Showcase PDF to test Continuous Scroll, Live Vector Ink Markup, Reflow Reader, and Voice Read-Aloud.",
+                                icon = Icons.Default.PictureAsPdf,
+                                actionLabel = "Browse files",
+                                onAction = { viewModel.navigateTo(Screen.FileExplorer) }
+                            )
+                            LiquidButton(
+                                label = "Launch 5-Page Pro Showcase PDF",
+                                icon = Icons.Default.AutoAwesome,
+                                onClick = { launchShowcasePdf() },
+                                modifier = Modifier.testTag("pdf_launch_showcase_button")
+                            )
+                        }
+
+                        rendered.error != null -> Box(Modifier.padding(VennelaTokens.spaceXl)) {
+                            VennelaErrorState(
+                                title = "This PDF could not be rendered",
+                                message = rendered.error ?: "Unknown rendering error",
+                                onRetry = { reloadKey++ },
+                                onDetails = { viewModel.navigateTo(Screen.FileMetadata) }
+                            )
+                        }
+
+                        rendered.pageCount > 0 && viewMode == PdfViewMode.CONTINUOUS -> {
+                            PdfContinuousScrollView(
+                                uri = selectedFile?.uri,
+                                fileKey = fileKey,
+                                pageCount = rendered.pageCount,
+                                currentPage = page,
+                                rotationDegrees = rotationDegrees,
+                                colorFilter = pdfColorFilter,
+                                annotationEpoch = annotationEpoch,
+                                onActivePageChanged = { newPage ->
+                                    if (newPage != page) page = newPage
+                                },
+                                onToggleBookmark = { idx ->
+                                    PdfBookmarkMemory.toggle(fileKey, idx)
+                                    annotationEpoch++
+                                }
+                            )
+                        }
+
+                        rendered.pageCount > 0 && viewMode == PdfViewMode.SPREAD -> {
+                            PdfTwoPageSpreadView(
+                                uri = selectedFile?.uri,
+                                fileKey = fileKey,
+                                pageCount = rendered.pageCount,
+                                currentPage = page,
+                                colorFilter = pdfColorFilter,
+                                onSelectPage = { idx -> goTo(idx) }
+                            )
+                        }
+
+                        rendered.pageCount > 0 && viewMode == PdfViewMode.REFLOW -> {
+                            PdfReflowReaderView(
+                                fileTitle = selectedFile?.name ?: "PDF Document",
+                                pageCount = rendered.pageCount,
+                                currentPage = page,
+                                pageTexts = pageTextsForReflow,
+                                onJumpToPage = { idx -> goTo(idx) }
+                            )
+                        }
+
+                        bitmap != null -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(VennelaTokens.spaceSm)
+                                    .graphicsLayer(
+                                        scaleX = scale,
+                                        scaleY = scale,
+                                        rotationZ = animatedRotation,
+                                        translationX = offset.x + dragX.value,
+                                        translationY = offset.y
+                                    )
+                                    .transformable(transformState)
+                                    .drawWithContent {
+                                        drawContent()
+                                        if (activeSuite == ViewerSuiteStyle.OKEN_SCANNER && suiteSession.showAutoCropHandles) {
+                                            val turquoise = Color(0xFF00D2A0)
+                                            val stroke = 2.5.dp.toPx()
+                                            val pad = 12.dp.toPx()
+                                            val corner = 22.dp.toPx()
+                                            val w = size.width - pad * 2
+                                            val h = size.height - pad * 2
+                                            drawRect(
+                                                color = turquoise.copy(alpha = 0.78f),
+                                                topLeft = Offset(pad, pad),
+                                                size = androidx.compose.ui.geometry.Size(w, h),
+                                                style = Stroke(width = 1.5.dp.toPx())
+                                            )
+                                            drawLine(turquoise, Offset(pad, pad), Offset(pad + corner, pad), stroke)
+                                            drawLine(turquoise, Offset(pad, pad), Offset(pad, pad + corner), stroke)
+                                            drawLine(turquoise, Offset(pad + w, pad), Offset(pad + w - corner, pad), stroke)
+                                            drawLine(turquoise, Offset(pad + w, pad), Offset(pad + w, pad + corner), stroke)
+                                            drawLine(turquoise, Offset(pad, pad + h), Offset(pad + corner, pad + h), stroke)
+                                            drawLine(turquoise, Offset(pad, pad + h), Offset(pad, pad + h - corner), stroke)
+                                            drawLine(turquoise, Offset(pad + w, pad + h), Offset(pad + w - corner, pad + h), stroke)
+                                            drawLine(turquoise, Offset(pad + w, pad + h), Offset(pad + w, pad + h - corner), stroke)
+                                        }
+                                        if (activeSuite == ViewerSuiteStyle.OKEN_SCANNER && suiteSession.showOfficialStamp) {
+                                            val stampRed = Color(0xFFD93025).copy(alpha = 0.76f)
+                                            val center = Offset(size.width - 68.dp.toPx(), size.height - 68.dp.toPx())
+                                            rotate(-14f, pivot = center) {
+                                                drawCircle(stampRed, radius = 36.dp.toPx(), center = center, style = Stroke(width = 2.5.dp.toPx()))
+                                                drawCircle(stampRed, radius = 31.dp.toPx(), center = center, style = Stroke(width = 1.dp.toPx()))
+                                            }
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    bitmap = bitmap.asImageBitmap(),
+                                    contentDescription = "PDF page ${page + 1}",
+                                    contentScale = ContentScale.Fit,
+                                    colorFilter = pdfColorFilter,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+
+                                // Live Vector Ink & Highlighter Overlay aligned to the page
+                                PdfAnnotationOverlay(
+                                    strokes = currentPageStrokes,
+                                    markupEnabled = showMarkupBar,
+                                    activeColor = activeInkColor,
+                                    isHighlighter = isHighlighter,
+                                    strokeScale = strokeScale,
+                                    onCommitStroke = { stroke ->
+                                        PdfAnnotationMemory.addStroke(fileKey, page, stroke)
+                                        annotationEpoch++
+                                    },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+
+                            if (dragX.value != 0f) {
+                                OverlayPill {
+                                    Text(
+                                        if (dragX.value < 0) "Next page →" else "← Previous page",
+                                        color = palette.textPrimary,
+                                        fontSize = VennelaTokens.micro,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+
+                            if (rendered.pageCount > 1 && !showMarkupBar) {
+                                HyperGutterRadar(
+                                    ticks = emptyList(),
+                                    currentScrollProgress = page.toFloat() /
+                                        (rendered.pageCount - 1).coerceAtLeast(1),
+                                    onScrub = { fraction ->
+                                        goToPage(
+                                            (fraction * (rendered.pageCount - 1)).toInt()
+                                                .coerceIn(0, rendered.pageCount - 1),
+                                            resetZoom = false
+                                        )
+                                    },
+                                    formatPageOrLineLabel = { fraction ->
+                                        "Page " + ((fraction * (rendered.pageCount - 1)).toInt()
+                                            .coerceIn(0, rendered.pageCount - 1) + 1)
+                                    },
+                                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxSize()
+                                )
+                            }
+
+                            if (showFindBar && activeHit != null) {
+                                OverlayPill(top = true) {
+                                    Text(
+                                        "Match ${safeFindIndex + 1} of ${findHits.size} • ${activeHit.title}",
+                                        color = palette.textPrimary,
+                                        fontSize = VennelaTokens.micro,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+
+                        else -> PdfGlassSkeleton(Modifier.fillMaxSize().padding(VennelaTokens.spaceXl))
+                    }
+
+                    if (showFindBar) {
+                        Column(
+                            Modifier.align(Alignment.TopCenter)
+                                .fillMaxWidth()
+                                .padding(horizontal = VennelaTokens.spaceSm),
+                            verticalArrangement = Arrangement.spacedBy(VennelaTokens.spaceSm)
+                        ) {
+                            PdfFindBar(
+                                query = findQuery,
+                                onQueryChange = { findQuery = it; findIndex = 0 },
+                                current = if (findHits.isEmpty()) 0 else safeFindIndex + 1,
+                                total = findHits.size,
+                                onPrevious = {
+                                    if (findHits.isNotEmpty()) {
+                                        findIndex = (safeFindIndex - 1 + findHits.size) % findHits.size
+                                    }
+                                },
+                                onNext = {
+                                    if (findHits.isNotEmpty()) findIndex = (safeFindIndex + 1) % findHits.size
+                                },
+                                onClose = { showFindBar = false; findQuery = "" }
+                            )
+                            AnimatedVisibility(
+                                visible = findQuery.isNotBlank(),
+                                enter = fadeIn(LiquidMotion.glide()) + expandVertically(LiquidMotion.glide()),
+                                exit = fadeOut(LiquidMotion.exit()) + shrinkVertically(LiquidMotion.exit())
+                            ) {
+                                PdfFindResultsPanel(
+                                    hits = findHits,
+                                    activeIndex = safeFindIndex,
+                                    hasTextLayer = searchableText.isNotEmpty(),
+                                    pageCount = rendered.pageCount,
+                                    onSelect = { index -> findIndex = index },
+                                    onDismiss = { showFindBar = false; findQuery = "" }
+                                )
+                            }
+                        }
+                    }
+                }
+                }
             }
         }
     }
 
     if (showTocSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showTocSheet = false },
-            containerColor = palette.cardSurfaceStrong,
-            contentColor = palette.textPrimary
+        ViewerGlassSheet(
+            title = "Outline & Bookmarks",
+            subtitle = "${rendered.pageCount} pages • ${bookmarkedPages.size} bookmarked",
+            onDismiss = { showTocSheet = false }
         ) {
-            Column(
-                Modifier.fillMaxWidth()
-                    .padding(horizontal = VennelaTokens.spaceXl)
-                    .padding(bottom = VennelaTokens.spaceXxl)
-            ) {
-                TrayHeader(
-                    Icons.AutoMirrored.Filled.ListAlt, "Outline",
-                    "${rendered.pageCount} pages • ${selectedFile?.name ?: "PDF"}"
-                )
-                Spacer(Modifier.height(VennelaTokens.spaceMd))
-                ChipRail(
-                    listOf(
-                        PdfChip("Jump to page", Icons.AutoMirrored.Filled.ListAlt) {
-                            showTocSheet = false; panel = PdfPanel.JUMP
-                        },
-                        PdfChip("Quick find", Icons.Default.Search) {
-                            showTocSheet = false; showFindBar = true
-                        },
-                        PdfChip("Full outline screen", Icons.Default.Info) {
-                            showTocSheet = false; viewModel.navigateTo(Screen.PdfToc)
-                        }
-                    )
-                )
-                Spacer(Modifier.height(VennelaTokens.spaceMd))
-                if (rendered.pageCount == 0) {
-                    Text(
-                        "The page tree has not been read yet, so there is nothing to list.",
-                        color = palette.textSecondary,
-                        fontSize = VennelaTokens.bodySmall
-                    )
-                } else {
-                    if (rendered.pageCount > PdfMaxOutlineRows) {
-                        Text(
-                            "Showing the first $PdfMaxOutlineRows of ${rendered.pageCount} pages",
-                            color = palette.textTertiary,
-                            fontSize = VennelaTokens.micro
-                        )
+            ChipRail(
+                listOf(
+                    PdfChip("Jump to page", Icons.AutoMirrored.Filled.ListAlt) {
+                        showTocSheet = false; panel = PdfPanel.JUMP
+                    },
+                    PdfChip("Quick find", Icons.Default.Search) {
+                        showTocSheet = false; showFindBar = true
+                    },
+                    PdfChip("Bookmark Page ${page + 1}", Icons.Default.Bookmark, isCurrentPageBookmarked) {
+                        PdfBookmarkMemory.toggle(fileKey, page)
+                        annotationEpoch++
+                    },
+                    PdfChip("Full outline screen", Icons.Default.Info) {
+                        showTocSheet = false; viewModel.navigateTo(Screen.PdfToc)
                     }
-                    LazyColumn(Modifier.fillMaxWidth().height(VennelaTokens.spaceHuge * 9)) {
-                        items(
-                            count = minOf(rendered.pageCount, PdfMaxOutlineRows),
-                            key = { index -> "outline_$index" }
-                        ) { index ->
-                            val active = index == page
-                            GlassListRow(
-                                title = "Page ${index + 1}",
-                                subtitle = if (active) "Currently open" else "Tap to open",
-                                modifier = Modifier.heightIn(min = VennelaTokens.touchTargetMin),
-                                leading = {
-                                    Icon(
-                                        Icons.Default.PictureAsPdf,
-                                        contentDescription = null,
-                                        tint = if (active) accent.secondary else palette.textTertiary,
-                                        modifier = Modifier.size(VennelaTokens.iconMd)
-                                    )
-                                },
-                                onClick = {
-                                    goTo(index)
-                                    showTocSheet = false
-                                }
-                            )
-                            if (index < minOf(rendered.pageCount, PdfMaxOutlineRows) - 1) GlassDivider()
+                )
+            )
+            if (bookmarkedPages.isNotEmpty()) {
+                Text(
+                    "Bookmarked Pages (${bookmarkedPages.size})",
+                    color = accent.secondary,
+                    fontSize = VennelaTokens.caption,
+                    fontWeight = FontWeight.Bold
+                )
+                ChipRail(
+                    bookmarkedPages.map { bPage ->
+                        PdfChip("★ Page ${bPage + 1}", Icons.Default.Bookmark, bPage == page) {
+                            goTo(bPage)
+                            showTocSheet = false
+                        }
+                    }
+                )
+            }
+            if (rendered.pageCount == 0) {
+                Text(
+                    "The page tree has not been read yet, so there is nothing to list.",
+                    color = palette.textSecondary,
+                    fontSize = VennelaTokens.bodySmall
+                )
+            } else {
+                LazyColumn(Modifier.fillMaxWidth().height(VennelaTokens.spaceHuge * 8)) {
+                    items(
+                        count = minOf(rendered.pageCount, PdfMaxOutlineRows),
+                        key = { index -> "outline_$index" }
+                    ) { index ->
+                        val active = index == page
+                        val bookmarked = index in bookmarkedPages
+                        val hasInk = PdfAnnotationMemory.strokes(fileKey, index).isNotEmpty()
+                        GlassListRow(
+                            title = buildString {
+                                append("Page ${index + 1}")
+                                if (bookmarked) append(" ★")
+                                if (hasInk) append(" • Annotated")
+                            },
+                            subtitle = if (active) "Currently open" else "Tap to jump to page ${index + 1}",
+                            modifier = Modifier.heightIn(min = VennelaTokens.touchTargetMin),
+                            leading = {
+                                Icon(
+                                    if (bookmarked) Icons.Default.Bookmark else Icons.Default.PictureAsPdf,
+                                    contentDescription = null,
+                                    tint = if (active || bookmarked) accent.secondary else palette.textTertiary,
+                                    modifier = Modifier.size(VennelaTokens.iconMd)
+                                )
+                            },
+                            onClick = {
+                                goTo(index)
+                                showTocSheet = false
+                            }
+                        )
+                        if (index < minOf(rendered.pageCount, PdfMaxOutlineRows) - 1) GlassDivider()
+                    }
+                }
+            }
+        }
+    }
+
+    if (showGridSheet && rendered.pageCount > 0) {
+        ViewerGlassSheet(
+            title = "All Pages Grid",
+            subtitle = "${rendered.pageCount} pages • ${selectedFile?.name ?: "PDF"}",
+            onDismiss = { showGridSheet = false }
+        ) {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = VennelaTokens.spaceHuge * 12),
+                horizontalArrangement = Arrangement.spacedBy(VennelaTokens.spaceSm),
+                verticalArrangement = Arrangement.spacedBy(VennelaTokens.spaceMd),
+                contentPadding = PaddingValues(bottom = VennelaTokens.spaceLg)
+            ) {
+                items(
+                    count = minOf(rendered.pageCount, PdfMaxOutlineRows),
+                    key = { index -> "grid_$index" }
+                ) { index ->
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(VennelaTokens.spaceXxs)
+                    ) {
+                        PdfPageThumbnail(
+                            uri = selectedFile?.uri,
+                            fileKey = fileKey,
+                            pageIndex = index,
+                            cache = thumbCache,
+                            active = index == page,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(132.dp)
+                        ) {
+                            goTo(index)
+                            showGridSheet = false
                         }
                     }
                 }
@@ -1091,7 +1614,10 @@ private fun PdfTray(
         exit = fadeOut(LiquidMotion.exit()) + shrinkVertically(LiquidMotion.exit())
     ) {
         GlassPanel(
-            modifier = Modifier.fillMaxWidth().padding(bottom = VennelaTokens.spaceSm),
+            modifier = Modifier
+                .widthIn(max = 720.dp)
+                .fillMaxWidth()
+                .padding(bottom = VennelaTokens.spaceSm),
             shape = RoundedCornerShape(VennelaTokens.radiusCard),
             elevation = VennelaTokens.elevationOverlay
         ) {
@@ -1367,14 +1893,20 @@ private fun PdfGlassSkeleton(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun PageIndicatorPill(label: String, onClick: () -> Unit) {
+private fun PageIndicatorPill(
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
     val accent = LocalVennelaAccent.current
     Row(
-        Modifier.clip(RoundedCornerShape(VennelaTokens.radiusPill))
+        modifier
+            .heightIn(min = VennelaTokens.touchTargetCompact)
+            .clip(RoundedCornerShape(VennelaTokens.radiusPill))
             .background(accent.primary.copy(alpha = 0.26f))
             .border(1.dp, accent.secondary.copy(alpha = 0.45f), RoundedCornerShape(VennelaTokens.radiusPill))
             .pressScale(pressedScale = 0.94f, onClick = onClick)
-            .padding(horizontal = VennelaTokens.spaceSm, vertical = VennelaTokens.spaceXxs),
+            .padding(horizontal = VennelaTokens.spaceMd, vertical = VennelaTokens.spaceXxs),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -1386,6 +1918,7 @@ private fun PageIndicatorPill(label: String, onClick: () -> Unit) {
         Spacer(Modifier.width(VennelaTokens.spaceXs))
         Text(
             label, color = accent.secondary,
+            fontFamily = VennelaFonts.Mono,
             fontSize = VennelaTokens.micro, fontWeight = FontWeight.Bold, maxLines = 1
         )
     }
@@ -1397,12 +1930,14 @@ private fun GlassRoundAction(
     description: String,
     enabled: Boolean = true,
     active: Boolean = false,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
     Box(
-        Modifier.size(VennelaTokens.viewerControl)
+        modifier
+            .size(VennelaTokens.touchTargetMin)
             .clip(CircleShape)
             .then(
                 if (active) {
@@ -1432,6 +1967,10 @@ private fun PdfPageThumbnail(
     pageIndex: Int,
     cache: ConcurrentHashMap<Int, Bitmap>,
     active: Boolean,
+    modifier: Modifier = Modifier.size(
+        width = VennelaTokens.badgeLg + VennelaTokens.spaceMd,
+        height = VennelaTokens.badgeLg + VennelaTokens.radiusCardLarge
+    ),
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
@@ -1481,10 +2020,7 @@ private fun PdfPageThumbnail(
     }
 
     Box(
-        Modifier.size(
-            width = VennelaTokens.badgeLg + VennelaTokens.spaceMd,
-            height = VennelaTokens.badgeLg + VennelaTokens.radiusCardLarge
-        )
+        modifier
             .clip(RoundedCornerShape(VennelaTokens.radiusChip))
             .background(palette.cardSurface.copy(alpha = 0.6f))
             .border(

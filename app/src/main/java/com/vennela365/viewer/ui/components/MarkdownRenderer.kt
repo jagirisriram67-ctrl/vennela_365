@@ -17,7 +17,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -29,6 +28,7 @@ import com.vennela365.viewer.parser.MdBlock
 import com.vennela365.viewer.parser.MdSpan
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
+import com.vennela365.viewer.theme.VennelaFonts
 
 /**
  * Tables compose as a single unit, so an enormous one would block a frame.
@@ -88,6 +88,7 @@ fun MarkdownBlockView(
         is MdBlock.Heading -> Text(
             text = inline(block.text, textColor, linkColor),
             color = headingColor,
+            fontFamily = if (block.level <= 2) VennelaFonts.Serif else VennelaFonts.Sans,
             fontSize = when (block.level) {
                 1 -> 28.sp
                 2 -> 23.sp
@@ -164,7 +165,7 @@ fun MarkdownBlockView(
             Text(
                 text = block.code,
                 color = textColor,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = VennelaFonts.Mono,
                 fontSize = 12.sp,
                 lineHeight = 18.sp,
                 modifier = Modifier.horizontalScroll(rememberScrollState())
@@ -272,7 +273,7 @@ private fun inline(spans: List<MdSpan>, textColor: Color, linkColor: Color): Ann
                             span.strike -> TextDecoration.LineThrough
                             else -> null
                         },
-                        fontFamily = if (span.code) FontFamily.Monospace else null,
+                        fontFamily = if (span.code) VennelaFonts.Mono else null,
                         background = if (span.code) textColor.copy(alpha = 0.10f) else Color.Unspecified,
                         fontSize = if (span.code) 13.sp else TextUnit.Unspecified
                     )

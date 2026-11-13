@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -59,6 +60,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -72,6 +74,7 @@ import com.vennela365.viewer.rendering.ViewerState
 import com.vennela365.viewer.storage.ShareUri
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.theme.liquidGlass
 import com.vennela365.viewer.theme.liquidGlassSpec
@@ -630,6 +633,7 @@ fun ArchiveBrowserScreen(viewModel: MainViewModel) {
                     // a slim top inset and keeps its breathing room in the
                     // scroll content so the last row clears the action pill.
                     .padding(top = VennelaTokens.viewerTopInset),
+                horizontalAlignment = Alignment.CenterHorizontally,
                 contentPadding = PaddingValues(
                     start = VennelaTokens.gutter,
                     end = VennelaTokens.gutter,
@@ -874,6 +878,7 @@ fun ArchiveBrowserScreen(viewModel: MainViewModel) {
                         } else {
                             "Search inside this archive"
                         },
+                        modifier = Modifier.testTag("archive_search_button"),
                         active = isSearchVisible,
                         onClick = {
                             isSearchVisible = !isSearchVisible
@@ -885,6 +890,7 @@ fun ArchiveBrowserScreen(viewModel: MainViewModel) {
                     ReaderIconButton(
                         icon = Icons.Default.SwapVert,
                         contentDescription = "Sort by ${sortMode.label}",
+                        modifier = Modifier.testTag("archive_sort_button"),
                         active = sortMode != ArchiveSortMode.NAME,
                         onClick = {
                             val next = when (sortMode) {
@@ -900,6 +906,7 @@ fun ArchiveBrowserScreen(viewModel: MainViewModel) {
                     ReaderIconButton(
                         icon = Icons.Default.Share,
                         contentDescription = "Share this archive",
+                        modifier = Modifier.testTag("archive_share_button"),
                         onClick = { shareArchive() }
                     )
                 }
@@ -925,6 +932,7 @@ fun ArchiveBrowserScreen(viewModel: MainViewModel) {
                             Icons.Default.FolderOpen
                         },
                         contentDescription = "Filter: ${typeFilter.label}",
+                        modifier = Modifier.testTag("archive_filter_button"),
                         active = typeFilter != ArchiveTypeFilter.ALL,
                         onClick = {
                             typeFilter = when (typeFilter) {
@@ -938,17 +946,20 @@ fun ArchiveBrowserScreen(viewModel: MainViewModel) {
                         ReaderIconButton(
                             icon = Icons.Default.KeyboardArrowUp,
                             contentDescription = "Up one level",
+                            modifier = Modifier.testTag("archive_up_button"),
                             onClick = { navigateUp() }
                         )
                     }
                     ReaderIconButton(
                         icon = Icons.Default.FolderZip,
                         contentDescription = "Archive properties",
+                        modifier = Modifier.testTag("archive_info_button"),
                         onClick = { viewModel.navigateTo(Screen.FileMetadata) }
                     )
                     ReaderIconButton(
                         icon = Icons.AutoMirrored.Filled.OpenInNew,
                         contentDescription = "Open this archive in another app",
+                        modifier = Modifier.testTag("archive_open_with_button"),
                         onClick = { openArchiveWith() }
                     )
                 }
@@ -992,6 +1003,7 @@ private fun ArchiveTrailBar(
     val accent = LocalVennelaAccent.current
     Row(
         modifier = Modifier
+            .widthIn(max = 860.dp)
             .fillMaxWidth()
             .heightIn(min = VennelaTokens.touchTargetCompact),
         verticalAlignment = Alignment.CenterVertically
@@ -1079,7 +1091,9 @@ private fun ArchiveSummaryRow(
     val accent = LocalVennelaAccent.current
     if (items <= 0) return
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .widthIn(max = 860.dp)
+            .fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
@@ -1092,6 +1106,7 @@ private fun ArchiveSummaryRow(
         Text(
             text = "$items items • $folders folders • $files files",
             color = palette.textTertiary,
+            fontFamily = VennelaFonts.Mono,
             fontSize = VennelaTokens.nano,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1100,6 +1115,7 @@ private fun ArchiveSummaryRow(
         Text(
             text = "$sortLabel • $filterLabel",
             color = palette.textTertiary,
+            fontFamily = VennelaFonts.Mono,
             fontSize = VennelaTokens.nano,
             maxLines = 1
         )
@@ -1124,6 +1140,7 @@ private fun ArchiveEntryRow(
     val accent = LocalVennelaAccent.current
     GlassPanel(
         modifier = Modifier
+            .widthIn(max = 860.dp)
             .fillMaxWidth()
             .staggeredEntrance(index, enabled = index < 12)
             .pressScale(pressedScale = 0.975f, onClick = onOpen),

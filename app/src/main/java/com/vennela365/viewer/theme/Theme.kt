@@ -1,5 +1,6 @@
 package com.vennela365.viewer.theme
 
+import android.app.Activity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -9,6 +10,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
@@ -16,8 +18,10 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 
 // ---------------------------------------------------------------------------
 // Nebula Flux Material 3 color schemes
@@ -74,6 +78,7 @@ fun VennelaTheme(
     activeTheme: AppTheme = AppTheme.LUNAR_NIGHT,
     themeMode: ThemeMode = ThemeMode.DARK,
     accent: AccentOption? = null,
+    fontStyle: AppFontStyle = AppFontStyle.ONEPLUS_SANS,
     content: @Composable () -> Unit
 ) {
     val isDark = when (themeMode) {
@@ -81,14 +86,28 @@ fun VennelaTheme(
         ThemeMode.LIGHT -> false
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
     }
-    val palette = (if (isDark) DarkVennelaPalette else LightVennelaPalette)
-        .tinted(accent?.toAccent() ?: activeTheme.toAccent())
     val resolvedAccent = accent?.toAccent() ?: activeTheme.toAccent()
+    val palette = (if (isDark) DarkVennelaPalette else LightVennelaPalette)
+        .tinted(resolvedAccent)
 
     val colorScheme = (if (isDark) DarkColorScheme else LightColorScheme).copy(
         primary = resolvedAccent.primary,
-        secondary = resolvedAccent.secondary
+        secondary = resolvedAccent.secondary,
+        background = palette.backgroundTop,
+        surface = palette.backgroundMid
     )
+
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            runCatching {
+                val window = (view.context as? Activity)?.window ?: return@runCatching
+                val controller = WindowCompat.getInsetsController(window, view)
+                controller.isAppearanceLightStatusBars = !isDark
+                controller.isAppearanceLightNavigationBars = !isDark
+            }
+        }
+    }
 
     CompositionLocalProvider(
         LocalVennelaPalette provides palette,
@@ -96,7 +115,7 @@ fun VennelaTheme(
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
-            typography = VennelaTypography,
+            typography = vennelaTypographyFor(fontStyle),
             content = content
         )
     }

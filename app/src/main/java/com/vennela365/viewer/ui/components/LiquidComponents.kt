@@ -29,11 +29,13 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.shape.CircleShape
@@ -71,6 +73,7 @@ import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
 import com.vennela365.viewer.theme.LiquidGlassSpec
 import com.vennela365.viewer.theme.LiquidMotion
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.theme.liquidGlass
 import com.vennela365.viewer.theme.liquidGlassSpec
@@ -117,11 +120,8 @@ fun GlassPanel(
 /* ------------------------------------------------------------------------- */
 
 /**
- * One consistent page frame: atmosphere, status/navigation insets, an optional
- * frosted top bar and an optional floating dock.
- *
- * Screens use this instead of hand-rolling `Scaffold` + `VennelaBackground` so
- * insets, gutters and dock clearance can never drift apart again.
+ * Unified page frame: atmosphere, edge-to-edge status/navigation insets,
+ * adaptive tablet centering, collapsible frosted top bar, and floating dock.
  */
 @Composable
 fun LiquidPage(
@@ -136,49 +136,45 @@ fun LiquidPage(
 ) {
     val statusInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val dockClearance = if (dock != null) 54.dp else 0.dp
-    val barHidden = rememberChromeHideState(scrollState)
+    val dockClearance = if (dock != null) 78.dp else 0.dp
 
-    // The page owns the atmosphere *and* the backdrop bitmap, so every glass
-    // surface below it frosts the real scenery instead of a flat fill.
     VennelaBackground(modifier = modifier.fillMaxSize()) {
         Box(modifier = Modifier.fillMaxSize()) {
-            Column(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 if (title != null) {
                     Spacer(modifier = Modifier.height(statusInset + VennelaTokens.spaceXxs))
-                    // The bar slides away while the reader scrolls down, the way
-                    // Google Photos and Drive hand the screen back to the
-                    // content, and returns the moment they scroll up.
-                    AnimatedVisibility(
-                        visible = !barHidden,
-                        enter = fadeIn(tween(LiquidMotion.durationFast)) +
-                            expandVertically(tween(LiquidMotion.durationFast)),
-                        exit = fadeOut(tween(LiquidMotion.durationFast)) +
-                            shrinkVertically(tween(LiquidMotion.durationFast))
-                    ) {
-                        LiquidTopBar(
-                            title = title,
-                            subtitle = subtitle,
-                            onBack = onBack,
-                            actions = topBarActions
-                        )
-                    }
+                    LiquidTopBar(
+                        title = title,
+                        subtitle = subtitle,
+                        onBack = onBack,
+                        actions = topBarActions
+                    )
                 } else {
                     Spacer(modifier = Modifier.height(statusInset))
                 }
-                content(
-                    PaddingValues(
-                        bottom = navInset + dockClearance + VennelaTokens.spaceSm,
-                        top = VennelaTokens.spaceXs
-                    )
-                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    Box(modifier = Modifier.widthIn(max = 880.dp).fillMaxWidth()) {
+                        content(
+                            PaddingValues(
+                                bottom = navInset + dockClearance + VennelaTokens.spaceSm,
+                                top = VennelaTokens.spaceXs
+                            )
+                        )
+                    }
+                }
             }
 
             if (dock != null) {
                 Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = navInset)
+                    modifier = Modifier.align(Alignment.BottomCenter)
                 ) {
                     dock()
                 }
@@ -228,10 +224,6 @@ fun rememberLazyGridScrollSignal(state: LazyGridState?): ScrollSignal? {
 
 /**
  * Tracks whether the page chrome should hide.
- *
- * Scrolling down hides it and scrolling up brings it back; returning to the
- * very top always reveals it again so the user is never stranded without
- * navigation.
  */
 @Composable
 fun rememberChromeHideState(signal: ScrollSignal?): Boolean {
@@ -333,27 +325,15 @@ fun SectionHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            // Neon accent bar — the section's signature.
-            Box(
-                modifier = Modifier
-                    .width(3.dp)
-                    .height(16.dp)
-                    .clip(RoundedCornerShape(VennelaTokens.radiusPill))
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(accent.secondary, accent.primary.copy(alpha = 0.72f))
-                        )
-                    )
-            )
-            Spacer(modifier = Modifier.width(VennelaTokens.spaceSm))
-            Text(
-                text = title,
-                color = palette.textPrimary,
-                fontSize = VennelaTokens.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-        }
+        Text(
+            text = title,
+            color = palette.textPrimary,
+            fontFamily = VennelaFonts.Sans,
+            fontSize = 18.sp,
+            lineHeight = 22.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = (-0.25).sp
+        )
         if (trailing != null) {
             trailing()
         } else if (actionLabel != null && onAction != null) {
@@ -361,22 +341,31 @@ fun SectionHeader(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .clip(RoundedCornerShape(VennelaTokens.radiusPill))
-                    .background(accent.primary.copy(alpha = 0.14f))
-                    .border(1.dp, accent.secondary.copy(alpha = 0.28f), RoundedCornerShape(VennelaTokens.radiusPill))
+                    .background(
+                        if (palette.isDark) Color.White.copy(alpha = 0.10f)
+                        else accent.primary.copy(alpha = 0.10f)
+                    )
+                    .border(
+                        1.dp,
+                        Color.White.copy(alpha = if (palette.isDark) 0.18f else 0.72f),
+                        RoundedCornerShape(VennelaTokens.radiusPill)
+                    )
                     .pressScale(pressedScale = 0.94f, onClick = onAction)
-                    .padding(horizontal = VennelaTokens.spaceSm, vertical = VennelaTokens.spaceXs)
+                    .padding(horizontal = 11.dp, vertical = 5.dp)
             ) {
                 Text(
                     text = actionLabel,
-                    color = accent.secondary,
-                    fontSize = VennelaTokens.bodySmall,
+                    color = if (palette.isDark) accent.secondary else accent.primary,
+                    fontFamily = VennelaFonts.Sans,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold
                 )
+                Spacer(modifier = Modifier.width(2.dp))
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
-                    tint = accent.secondary,
-                    modifier = Modifier.size(VennelaTokens.iconSm)
+                    tint = if (palette.isDark) accent.secondary else accent.primary,
+                    modifier = Modifier.size(15.dp)
                 )
             }
         }
@@ -388,13 +377,7 @@ fun SectionHeader(
 /* ------------------------------------------------------------------------- */
 
 /**
- * The coloured, gradient-filled rounded square that identifies a file type or
- * category. Shared by the home tiles, file rows and category screens so the
- * whole app speaks one visual language.
- *
- * When [onClick] is supplied the badge becomes an action and grows an invisible
- * touch target of at least [VennelaTokens.touchTargetMin] without changing the
- * painted size, so top-bar actions stay both pretty and accessible.
+ * Apple iOS squircle icon badge with top-left specular sheen and crisp glyph.
  */
 @Composable
 fun IconBadge(
@@ -410,19 +393,29 @@ fun IconBadge(
         Box(
             modifier = Modifier
                 .size(size)
+                .shadow(
+                    elevation = 6.dp,
+                    shape = RoundedCornerShape(radius),
+                    clip = false,
+                    ambientColor = colors.first().copy(alpha = 0.32f),
+                    spotColor = colors.last().copy(alpha = 0.32f)
+                )
                 .clip(RoundedCornerShape(radius))
                 .background(
                     Brush.linearGradient(
                         listOf(
                             colors.first(),
-                            colors.last().copy(alpha = 0.86f)
+                            colors.last().copy(alpha = 0.90f)
                         )
                     )
                 )
                 .border(
                     1.dp,
                     Brush.verticalGradient(
-                        listOf(Color.White.copy(alpha = 0.42f), Color.White.copy(alpha = 0.06f))
+                        listOf(
+                            Color.White.copy(alpha = 0.54f),
+                            Color.White.copy(alpha = 0.10f)
+                        )
                     ),
                     RoundedCornerShape(radius)
                 ),
@@ -432,7 +425,7 @@ fun IconBadge(
                 imageVector = icon,
                 contentDescription = contentDescription,
                 tint = Color.White,
-                modifier = Modifier.size(size * 0.48f)
+                modifier = Modifier.size(size * 0.50f)
             )
         }
     }
@@ -486,7 +479,6 @@ fun Modifier.pressScale(
 
 /**
  * Staggered entrance so lists cascade in instead of popping all at once.
- * Rows rise, scale up and fade in on a shared rhythm.
  */
 @Composable
 fun Modifier.staggeredEntrance(index: Int, enabled: Boolean = true): Modifier {
@@ -502,9 +494,9 @@ fun Modifier.staggeredEntrance(index: Int, enabled: Boolean = true): Modifier {
         .alpha(visible.value)
         .graphicsLayer {
             val t = visible.value
-            translationY = (1f - t) * 30f
-            scaleX = 0.94f + 0.06f * t
-            scaleY = 0.94f + 0.06f * t
+            translationY = (1f - t) * 24f
+            scaleX = 0.95f + 0.05f * t
+            scaleY = 0.95f + 0.05f * t
         }
 }
 
@@ -523,50 +515,65 @@ fun LiquidChip(
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
     val bg by animateColorAsState(
-        targetValue = if (isActive) accent.primary.copy(alpha = 0.46f)
-        else palette.cardSurface.copy(alpha = 0.36f),
-        animationSpec = androidx.compose.animation.core.tween(LiquidMotion.durationFast),
+        targetValue = when {
+            isActive && palette.isDark -> accent.primary.copy(alpha = 0.44f)
+            isActive -> accent.primary.copy(alpha = 0.20f)
+            palette.isDark -> Color(0xFF171F35).copy(alpha = 0.62f)
+            else -> Color.White.copy(alpha = 0.82f)
+        },
+        animationSpec = tween(LiquidMotion.durationFast),
         label = "chipBg"
     )
     val border by animateColorAsState(
-        targetValue = if (isActive) accent.secondary.copy(alpha = 0.95f)
-        else palette.cardBorder.copy(alpha = 0.60f),
-        animationSpec = androidx.compose.animation.core.tween(LiquidMotion.durationFast),
+        targetValue = when {
+            isActive -> accent.secondary.copy(alpha = if (palette.isDark) 0.72f else 0.56f)
+            palette.isDark -> Color.White.copy(alpha = 0.20f)
+            else -> Color.White.copy(alpha = 0.88f)
+        },
+        animationSpec = tween(LiquidMotion.durationFast),
         label = "chipBorder"
     )
     val spec = LiquidGlassSpec(
-        tint = bg,
-        tintEnd = if (isActive) accent.secondary.copy(alpha = 0.30f) else bg,
+        tint = if (isActive && palette.isDark) Color.White.copy(alpha = 0.18f) else bg,
+        tintEnd = if (isActive) accent.secondary.copy(alpha = if (palette.isDark) 0.28f else 0.16f) else bg,
         frost = VennelaTokens.frostLight,
-        backdropAlpha = 0.5f,
+        backdropAlpha = 0.64f,
         rim = border,
         rimWidth = 1.dp,
-        sheen = if (isActive) 0.30f else 0.16f,
-        elevation = if (isActive) 10.dp else 4.dp,
-        shadowColor = if (isActive) accent.secondary.copy(alpha = 0.45f) else Color(0x66000000),
-        highlight = if (isActive) 0.22f else 0.10f
+        sheen = if (isActive) 0.28f else 0.18f,
+        elevation = if (isActive) 8.dp else 4.dp,
+        shadowColor = if (isActive) accent.primary.copy(alpha = 0.32f) else Color(0x33000000),
+        highlight = if (isActive) 0.22f else 0.14f
     )
+    val fgColor = when {
+        isActive && palette.isDark -> Color.White
+        isActive -> accent.primary
+        else -> palette.textPrimary
+    }
     Row(
         modifier = modifier
+            .heightIn(min = 36.dp)
             .liquidGlass(spec, RoundedCornerShape(VennelaTokens.radiusPill))
             .pressScale(pressedScale = 0.93f, onClick = onClick)
-            .padding(horizontal = 13.dp, vertical = 8.dp),
+            .padding(horizontal = 14.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(VennelaTokens.spaceXs)
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         if (icon != null) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = if (isActive) Color.White else accent.secondary.copy(alpha = 0.85f),
-                modifier = Modifier.size(VennelaTokens.iconSm)
+                tint = if (isActive) fgColor else accent.secondary,
+                modifier = Modifier.size(16.dp)
             )
         }
         Text(
             text = text,
-            color = if (isActive) Color.White else palette.textPrimary,
-            fontSize = VennelaTokens.caption,
-            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+            color = fgColor,
+            fontFamily = VennelaFonts.Sans,
+            fontSize = 12.5.sp,
+            lineHeight = 15.sp,
+            fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold,
             maxLines = 1
         )
     }
@@ -577,10 +584,7 @@ fun LiquidChip(
 /* ------------------------------------------------------------------------- */
 
 /**
- * A file / folder / setting row on the glass system.
- *
- * Trailing chevrons rotate in on press and the leading badge lifts slightly,
- * giving the row a sense of depth without any layout cost.
+ * Apple iOS inset-grouped list row on the Liquid Glass system.
  */
 @Composable
 fun GlassListRow(
@@ -597,18 +601,20 @@ fun GlassListRow(
         modifier = modifier
             .fillMaxWidth()
             .then(if (onClick != null) Modifier.pressScale(0.985f, onClick) else Modifier)
-            .padding(horizontal = VennelaTokens.spaceLg, vertical = 11.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (leading != null) {
             leading()
-            Spacer(modifier = Modifier.width(VennelaTokens.spaceMd))
+            Spacer(modifier = Modifier.width(12.dp))
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
                 color = palette.textPrimary,
-                fontSize = VennelaTokens.titleSmall,
+                fontFamily = VennelaFonts.Sans,
+                fontSize = 15.sp,
+                lineHeight = 19.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -618,7 +624,9 @@ fun GlassListRow(
                 Text(
                     text = subtitle,
                     color = palette.textSecondary,
-                    fontSize = VennelaTokens.caption,
+                    fontFamily = VennelaFonts.Sans,
+                    fontSize = 12.sp,
+                    lineHeight = 15.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -628,11 +636,12 @@ fun GlassListRow(
             Row(verticalAlignment = Alignment.CenterVertically, content = trailing)
         }
         if (showChevron) {
+            Spacer(modifier = Modifier.width(4.dp))
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = palette.textTertiary,
-                modifier = Modifier.size(VennelaTokens.iconSm)
+                modifier = Modifier.size(18.dp)
             )
         }
     }
@@ -645,13 +654,13 @@ fun GlassDivider(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = VennelaTokens.spaceLg)
+            .padding(horizontal = 16.dp)
             .height(1.dp)
             .background(
                 Brush.horizontalGradient(
                     listOf(
                         Color.Transparent,
-                        palette.cardBorder.copy(alpha = 0.7f),
+                        palette.cardBorder.copy(alpha = if (palette.isDark) 0.55f else 0.70f),
                         Color.Transparent
                     )
                 )
@@ -673,46 +682,62 @@ fun LiquidButton(
     fillWidth: Boolean = true
 ) {
     val accent = LocalVennelaAccent.current
+    val shape = RoundedCornerShape(VennelaTokens.radiusPill)
     Row(
         modifier = modifier
             .then(if (fillWidth) Modifier.fillMaxWidth() else Modifier)
+            .heightIn(min = 46.dp)
             .shadow(
-                elevation = if (enabled) 16.dp else 0.dp,
-                shape = RoundedCornerShape(VennelaTokens.radiusPill),
+                elevation = if (enabled) 12.dp else 0.dp,
+                shape = shape,
                 clip = false,
-                ambientColor = accent.primary.copy(alpha = 0.70f),
-                spotColor = accent.secondary.copy(alpha = 0.70f)
+                ambientColor = accent.primary.copy(alpha = 0.45f),
+                spotColor = accent.secondary.copy(alpha = 0.45f)
             )
-            .clip(RoundedCornerShape(VennelaTokens.radiusPill))
+            .clip(shape)
             .background(
-                Brush.linearGradient(
+                Brush.verticalGradient(
                     listOf(
-                        accent.primary,
-                        accent.primary.copy(alpha = 0.90f),
-                        accent.secondary
+                        accent.secondary.copy(alpha = 0.94f),
+                        accent.primary
                     )
                 )
             )
             .border(
-                BorderStroke(1.dp, Color.White.copy(alpha = 0.40f)),
-                RoundedCornerShape(VennelaTokens.radiusPill)
+                BorderStroke(
+                    1.dp,
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.White.copy(alpha = 0.58f),
+                            Color.White.copy(alpha = 0.16f)
+                        )
+                    )
+                ),
+                shape
             )
-            .pressScale(pressedScale = 0.955f, onClick = if (enabled) onClick else null)
+            .pressScale(pressedScale = 0.96f, onClick = if (enabled) onClick else null)
             .alpha(if (enabled) 1f else 0.5f)
-            .padding(horizontal = VennelaTokens.spaceXl, vertical = 13.dp),
+            .padding(horizontal = 18.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (icon != null) {
-            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(VennelaTokens.iconMd))
-            Spacer(modifier = Modifier.width(VennelaTokens.spaceSm))
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
         }
         Text(
             text = label,
             color = Color.White,
-            fontSize = VennelaTokens.body,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 0.2.sp
+            fontFamily = VennelaFonts.Sans,
+            fontSize = 14.sp,
+            lineHeight = 18.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = (-0.1).sp
         )
     }
 }

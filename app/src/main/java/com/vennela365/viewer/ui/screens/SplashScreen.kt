@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -51,7 +52,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -60,20 +60,13 @@ import com.vennela365.viewer.R
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
 import com.vennela365.viewer.theme.LiquidMotion
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.ui.components.pressScale
 import com.vennela365.viewer.viewmodel.MainViewModel
 import com.vennela365.viewer.viewmodel.Screen
 import kotlinx.coroutines.delay
 
-/**
- * Splash / first-run surface.
- *
- * The artwork carries the scene, so the type is kept deliberately quiet: a
- * pulsing moon mark, a gradient serif wordmark, a hairline rule, and one
- * prominent glass action. The screen also advances on its own after a beat so
- * the app never feels stuck.
- */
 @Composable
 fun SplashScreen(viewModel: MainViewModel) {
     val accent = LocalVennelaAccent.current
@@ -88,7 +81,7 @@ fun SplashScreen(viewModel: MainViewModel) {
         label = "splashAlpha"
     )
     val contentRise by animateFloatAsState(
-        targetValue = if (entered) 0f else 36f,
+        targetValue = if (entered) 0f else 32f,
         animationSpec = tween(LiquidMotion.durationHero, easing = LiquidMotion.emphasisEasing),
         label = "splashRise"
     )
@@ -108,8 +101,6 @@ fun SplashScreen(viewModel: MainViewModel) {
         ),
         label = "sheen"
     )
-    // Cinematic moon: a slow breathing glow, a halo that flares on the same
-    // beat, and a ring that keeps expanding past the mark.
     val moonPulse by shimmer.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
@@ -171,16 +162,15 @@ fun SplashScreen(viewModel: MainViewModel) {
             modifier = Modifier.fillMaxSize()
         )
 
-        // Scrim: keeps the wordmark legible over the brightest part of the art.
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        0f to scrim.copy(alpha = 0.40f),
-                        0.42f to scrim.copy(alpha = 0.10f),
-                        0.72f to scrim.copy(alpha = 0.60f),
-                        1f to scrim.copy(alpha = 0.90f)
+                        0f to scrim.copy(alpha = 0.36f),
+                        0.44f to scrim.copy(alpha = 0.08f),
+                        0.72f to scrim.copy(alpha = 0.62f),
+                        1f to scrim.copy(alpha = 0.92f)
                     )
                 )
         )
@@ -199,7 +189,7 @@ fun SplashScreen(viewModel: MainViewModel) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Bottom
         ) {
-            Spacer(modifier = Modifier.weight(0.9f))
+            Spacer(modifier = Modifier.weight(0.95f))
             SplashMoonMark(
                 pulse = moonPulse,
                 halo = markHalo,
@@ -207,7 +197,7 @@ fun SplashScreen(viewModel: MainViewModel) {
                 ring2Progress = ring2Progress,
                 sweepX = sweepX
             )
-            Spacer(modifier = Modifier.weight(1.1f))
+            Spacer(modifier = Modifier.weight(1.05f))
 
             Text(
                 text = buildAnnotatedString {
@@ -215,9 +205,9 @@ fun SplashScreen(viewModel: MainViewModel) {
                         SpanStyle(
                             brush = Brush.horizontalGradient(
                                 listOf(
-                                    palette.textPrimary,
+                                    Color.White,
                                     accent.secondary,
-                                    palette.textPrimary
+                                    Color.White
                                 )
                             )
                         )
@@ -226,21 +216,21 @@ fun SplashScreen(viewModel: MainViewModel) {
                     }
                 },
                 fontSize = 44.sp,
-                fontFamily = FontFamily.Serif,
+                fontFamily = VennelaFonts.Serif,
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp,
+                letterSpacing = (-0.5).sp,
                 style = TextStyle(
                     shadow = Shadow(
                         color = accent.secondary.copy(alpha = 0.55f),
-                        blurRadius = 22f
+                        blurRadius = 24f
                     )
                 )
             )
             Spacer(modifier = Modifier.height(VennelaTokens.spaceSm))
             Box(
                 modifier = Modifier
-                    .width(84.dp)
-                    .height(1.dp)
+                    .width(88.dp)
+                    .height(1.5.dp)
                     .background(
                         Brush.horizontalGradient(
                             listOf(Color.Transparent, accent.secondary.copy(alpha = 0.9f), Color.Transparent)
@@ -251,18 +241,19 @@ fun SplashScreen(viewModel: MainViewModel) {
             Text(
                 text = "UNIVERSAL FILE VIEWER",
                 color = palette.textSecondary,
+                fontFamily = VennelaFonts.Sans,
                 fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                letterSpacing = 3.4.sp
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 3.2.sp
             )
 
             Spacer(modifier = Modifier.height(VennelaTokens.spaceHuge))
 
-            // Glass "Get Started" capsule with a travelling sheen.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(62.dp)
+                    .widthIn(max = 420.dp)
+                    .height(60.dp)
                     .shadow(
                         elevation = 22.dp,
                         shape = RoundedCornerShape(VennelaTokens.radiusPill),
@@ -273,16 +264,16 @@ fun SplashScreen(viewModel: MainViewModel) {
                     .background(
                         Brush.horizontalGradient(
                             listOf(
-                                accent.primary.copy(alpha = 0.92f),
+                                accent.primary.copy(alpha = 0.94f),
                                 accent.primary,
-                                accent.secondary.copy(alpha = 0.88f)
+                                accent.secondary.copy(alpha = 0.90f)
                             )
                         )
                     )
                     .border(
                         1.5.dp,
                         Brush.verticalGradient(
-                            listOf(palette.textPrimary.copy(alpha = 0.55f), accent.secondary.copy(alpha = 0.35f))
+                            listOf(Color.White.copy(alpha = 0.55f), accent.secondary.copy(alpha = 0.35f))
                         ),
                         RoundedCornerShape(VennelaTokens.radiusPill)
                     )
@@ -299,7 +290,7 @@ fun SplashScreen(viewModel: MainViewModel) {
                             Brush.horizontalGradient(
                                 listOf(
                                     Color.Transparent,
-                                    palette.textPrimary.copy(alpha = 0.16f),
+                                    Color.White.copy(alpha = 0.18f),
                                     Color.Transparent
                                 )
                             )
@@ -315,22 +306,23 @@ fun SplashScreen(viewModel: MainViewModel) {
                     Spacer(modifier = Modifier.width(1.dp))
                     Text(
                         text = "Get Started",
-                        color = palette.textPrimary,
+                        color = Color.White,
+                        fontFamily = VennelaFonts.Sans,
                         fontSize = 17.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                     Box(
                         modifier = Modifier
-                            .size(42.dp)
+                            .size(40.dp)
                             .clip(CircleShape)
-                            .background(palette.textPrimary.copy(alpha = 0.22f))
-                            .border(1.dp, palette.textPrimary.copy(alpha = 0.35f), CircleShape),
+                            .background(Color.White.copy(alpha = 0.22f))
+                            .border(1.dp, Color.White.copy(alpha = 0.35f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = null,
-                            tint = palette.textPrimary,
+                            contentDescription = "Get Started",
+                            tint = Color.White,
                             modifier = Modifier.size(VennelaTokens.iconMd)
                         )
                     }
@@ -340,10 +332,11 @@ fun SplashScreen(viewModel: MainViewModel) {
             Spacer(modifier = Modifier.height(VennelaTokens.spaceLg))
 
             Text(
-                text = "Offline • Private • Read-only",
+                text = "Offline • Private • Instant Preview",
                 color = palette.textTertiary,
-                fontSize = 11.sp,
-                letterSpacing = 0.6.sp
+                fontFamily = VennelaFonts.Sans,
+                fontSize = 12.sp,
+                letterSpacing = 0.4.sp
             )
         }
 

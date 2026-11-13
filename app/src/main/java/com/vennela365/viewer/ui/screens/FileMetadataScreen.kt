@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -79,8 +80,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -94,6 +95,7 @@ import com.vennela365.viewer.parser.FileParserManager
 import com.vennela365.viewer.registry.FormatCategory
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.theme.liquidGlassSpec
 import com.vennela365.viewer.theme.liquidGlass
@@ -344,6 +346,7 @@ fun FileMetadataScreen(viewModel: MainViewModel) {
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
             contentPadding = PaddingValues(
                 start = VennelaTokens.gutter,
                 end = VennelaTokens.gutter,
@@ -772,6 +775,7 @@ private fun HeroPreviewCard(
                 .align(Alignment.BottomEnd)
                 .padding(VennelaTokens.spaceMd)
                 .size(VennelaTokens.touchTargetMin)
+                .testTag("metadata_open_viewer_button")
                 .clip(CircleShape)
                 .background(palette.cardSurfaceStrong.copy(alpha = 0.82f))
                 .border(1.dp, accent.secondary.copy(alpha = 0.4f), CircleShape)
@@ -796,7 +800,7 @@ private fun MetaSection(
 ) {
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
-    GlassCard {
+    GlassCard(modifier = Modifier.widthIn(max = 840.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconBadge(
                 icon = icon,
@@ -1044,14 +1048,14 @@ private fun TechnicalLine(label: String, value: String) {
             text = label,
             color = palette.textTertiary,
             fontSize = VennelaTokens.nano,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = VennelaFonts.Mono,
             modifier = Modifier.width(128.dp)
         )
         Text(
             text = value,
             color = palette.textSecondary,
             fontSize = VennelaTokens.nano,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = VennelaFonts.Mono,
             modifier = Modifier.weight(1f)
         )
     }
@@ -1095,21 +1099,21 @@ private fun HexPreview(rows: List<HexRow>) {
                                 text = row.offset,
                                 color = palette.textTertiary,
                                 fontSize = VennelaTokens.nano,
-                                fontFamily = FontFamily.Monospace
+                                fontFamily = VennelaFonts.Mono
                             )
                             Spacer(Modifier.width(VennelaTokens.spaceSm))
                             Text(
                                 text = row.hexBytes,
                                 color = palette.textSecondary,
                                 fontSize = VennelaTokens.nano,
-                                fontFamily = FontFamily.Monospace
+                                fontFamily = VennelaFonts.Mono
                             )
                             Spacer(Modifier.width(VennelaTokens.spaceSm))
                             Text(
                                 text = row.ascii,
                                 color = accent.secondary,
                                 fontSize = VennelaTokens.nano,
-                                fontFamily = FontFamily.Monospace
+                                fontFamily = VennelaFonts.Mono
                             )
                         }
                     }
@@ -1136,6 +1140,7 @@ private fun MetadataActionDock(
     )
     Row(
         modifier = Modifier
+            .widthIn(max = 560.dp)
             .fillMaxWidth()
             .padding(horizontal = VennelaTokens.gutter, vertical = VennelaTokens.spaceSm)
             .liquidGlass(spec, RoundedCornerShape(VennelaTokens.radiusDock))
@@ -1143,10 +1148,10 @@ private fun MetadataActionDock(
         horizontalArrangement = Arrangement.spacedBy(VennelaTokens.spaceXs),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        DockAction("Info", Icons.Default.Info, active = true, onClick = onInfo, modifier = Modifier.weight(1f), palette = palette, accent = accent)
-        DockAction("Share", Icons.Default.Share, active = false, onClick = onShare, modifier = Modifier.weight(1f), palette = palette, accent = accent)
-        DockAction("Copy Path", Icons.Default.ContentCopy, active = false, onClick = onCopyPath, modifier = Modifier.weight(1f), palette = palette, accent = accent)
-        DockAction("More", Icons.Default.MoreHoriz, active = false, onClick = onMore, modifier = Modifier.weight(1f), palette = palette, accent = accent)
+        DockAction("Info", Icons.Default.Info, active = true, onClick = onInfo, modifier = Modifier.weight(1f).testTag("meta_dock_info"), palette = palette, accent = accent)
+        DockAction("Share", Icons.Default.Share, active = false, onClick = onShare, modifier = Modifier.weight(1f).testTag("meta_dock_share"), palette = palette, accent = accent)
+        DockAction("Copy Path", Icons.Default.ContentCopy, active = false, onClick = onCopyPath, modifier = Modifier.weight(1f).testTag("meta_dock_copy"), palette = palette, accent = accent)
+        DockAction("More", Icons.Default.MoreHoriz, active = false, onClick = onMore, modifier = Modifier.weight(1f).testTag("meta_dock_more"), palette = palette, accent = accent)
     }
 }
 

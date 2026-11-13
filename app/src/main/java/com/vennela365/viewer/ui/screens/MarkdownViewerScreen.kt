@@ -74,12 +74,12 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -94,6 +94,7 @@ import com.vennela365.viewer.storage.ShareUri
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
 import com.vennela365.viewer.theme.VennelaAccent
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.theme.ViewerColorMode
 import com.vennela365.viewer.theme.applyViewerColorMode
@@ -649,12 +650,14 @@ fun MarkdownViewerScreen(viewModel: MainViewModel) {
                     ReaderIconButton(
                         icon = Icons.Default.Search,
                         contentDescription = "Search library",
+                        modifier = Modifier.testTag("md_search_library_button"),
                         onClick = { viewModel.navigateTo(Screen.UniversalSearch) }
                     )
                     Spacer(modifier = Modifier.width(VennelaTokens.spaceXs))
                     ReaderIconButton(
                         icon = Icons.Default.MoreVert,
                         contentDescription = "File details",
+                        modifier = Modifier.testTag("md_info_button"),
                         onClick = { viewModel.navigateTo(Screen.FileMetadata) }
                     )
                 }
@@ -672,6 +675,7 @@ fun MarkdownViewerScreen(viewModel: MainViewModel) {
                     ReaderIconButton(
                         icon = if (isRawMode) Icons.Default.Visibility else Icons.Default.Code,
                         contentDescription = if (isRawMode) "Rendered view" else "Source view",
+                        modifier = Modifier.testTag("md_mode_button"),
                         active = isRawMode,
                         onClick = {
                             isRawMode = !isRawMode
@@ -681,6 +685,7 @@ fun MarkdownViewerScreen(viewModel: MainViewModel) {
                     ReaderIconButton(
                         icon = Icons.Default.Search,
                         contentDescription = "Find in document",
+                        modifier = Modifier.testTag("md_find_button"),
                         active = isFindOpen,
                         onClick = {
                             isFindOpen = !isFindOpen
@@ -691,6 +696,7 @@ fun MarkdownViewerScreen(viewModel: MainViewModel) {
                         ReaderIconButton(
                             icon = Icons.AutoMirrored.Filled.FormatListBulleted,
                             contentDescription = "Contents",
+                            modifier = Modifier.testTag("md_toc_button"),
                             active = isTocOpen,
                             onClick = {
                                 isTocOpen = !isTocOpen
@@ -701,16 +707,19 @@ fun MarkdownViewerScreen(viewModel: MainViewModel) {
                     ReaderIconButton(
                         icon = Icons.Default.Tune,
                         contentDescription = "Reading settings",
+                        modifier = Modifier.testTag("md_settings_button"),
                         onClick = { isSettingsOpen = true }
                     )
                     ReaderIconButton(
                         icon = Icons.Default.ContentCopy,
                         contentDescription = "Copy document text",
+                        modifier = Modifier.testTag("md_copy_button"),
                         onClick = { copyText() }
                     )
                     ReaderIconButton(
                         icon = Icons.Default.Share,
                         contentDescription = "Share document",
+                        modifier = Modifier.testTag("md_share_button"),
                         onClick = { shareFile() }
                     )
                 }
@@ -829,9 +838,14 @@ private fun RenderedReadingSurface(
     val accent = LocalVennelaAccent.current
     val pageShape = RoundedCornerShape(VennelaTokens.radiusCard)
 
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.TopCenter
+    ) {
     LazyColumn(
         state = listState,
         modifier = Modifier
+            .widthIn(max = 820.dp)
             .fillMaxSize()
             .padding(horizontal = VennelaTokens.gutter)
             // The floating chrome draws over the page, so the page must not
@@ -947,6 +961,7 @@ private fun RenderedReadingSurface(
             }
         }
     }
+    }
 }
 
 /**
@@ -990,12 +1005,16 @@ private fun SourceListing(
     // per-row scroll state is allocated inside the loop.
     val horizontalScroll = rememberScrollState()
 
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.TopCenter
+    ) {
     ReaderPaper(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = VennelaTokens.gutter)
             .padding(top = 70.dp, bottom = 104.dp),
-        maxWidth = null,
+        maxWidth = 860.dp,
         cornerRadius = VennelaTokens.radiusCard,
         contentPadding = PaddingValues(
             horizontal = VennelaTokens.spaceSm,
@@ -1024,7 +1043,7 @@ private fun SourceListing(
                     text = "${index + 1}",
                     color = if (index == activeLine) accent.secondary else palette.textTertiary,
                     fontSize = VennelaTokens.micro,
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = VennelaFonts.Mono,
                     lineHeight = stepSp,
                     maxLines = 1,
                     modifier = Modifier
@@ -1035,7 +1054,7 @@ private fun SourceListing(
                     text = windowAnnotated.getOrNull(index - windowStart)
                         ?: AnnotatedString(rendered[index].take(MaxCharsPerSourceLine)),
                     color = palette.textPrimary,
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = VennelaFonts.Mono,
                     fontSize = VennelaTokens.caption,
                     lineHeight = stepSp,
                     softWrap = wrap,
@@ -1065,6 +1084,7 @@ private fun SourceListing(
             color = palette.textTertiary,
             fontSize = VennelaTokens.micro
         )
+    }
     }
     }
 }
@@ -1119,7 +1139,7 @@ private fun GlassCodeBlock(block: MdBlock.Code, baseFontSize: androidx.compose.u
         Text(
             text = block.code,
             color = palette.textPrimary,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = VennelaFonts.Mono,
             fontSize = baseFontSize,
             lineHeight = baseFontSize * 1.5,
             softWrap = false,

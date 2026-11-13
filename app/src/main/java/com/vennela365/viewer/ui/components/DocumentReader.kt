@@ -152,26 +152,58 @@ fun ReaderIconButton(
 ) {
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
-    val resolved = tint ?: if (active) accent.secondary else palette.textSecondary
-    val spec = liquidGlassSpec(
-        alpha = if (active) 0.50f else 0.32f,
-        frost = VennelaTokens.frostLight,
-        elevation = VennelaTokens.elevationFlat,
-        sheen = 0.12f
+    val resolved = tint ?: when {
+        !enabled -> palette.textTertiary
+        active -> if (palette.isDark) Color.White else accent.primary
+        else -> palette.textPrimary
+    }
+    val fillBrush = when {
+        active && palette.isDark -> Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.24f),
+                accent.primary.copy(alpha = 0.42f),
+                accent.secondary.copy(alpha = 0.28f)
+            )
+        )
+        active -> Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.96f),
+                accent.primary.copy(alpha = 0.24f)
+            )
+        )
+        palette.isDark -> Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.14f),
+                Color.White.copy(alpha = 0.06f)
+            )
+        )
+        else -> Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.90f),
+                palette.cardSurface.copy(alpha = 0.72f)
+            )
+        )
+    }
+    val rimBrush = Brush.verticalGradient(
+        listOf(
+            Color.White.copy(alpha = if (active) 0.62f else if (palette.isDark) 0.28f else 0.85f),
+            if (active) accent.secondary.copy(alpha = 0.48f) else Color.White.copy(alpha = 0.10f)
+        )
     )
     Box(
         modifier = modifier
             .size(VennelaTokens.controlSm)
             .clip(CircleShape)
-            .liquidGlass(spec, CircleShape)
+            .background(fillBrush, CircleShape)
+            .border(1.dp, rimBrush, CircleShape)
             .pressScale(pressedScale = 0.90f, onClick = if (enabled) onClick else null),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = if (enabled) resolved else palette.textTertiary,
-            modifier = Modifier.size(VennelaTokens.iconSm)
+            tint = resolved,
+            modifier = Modifier.size(18.dp)
         )
     }
 }
@@ -188,29 +220,31 @@ fun ReaderBottomPill(
 ) {
     val palette = LocalVennelaPalette.current
     val spec = liquidGlassSpec(
-        alpha = 0.42f,
-        frost = VennelaTokens.frostRegular,
-        elevation = VennelaTokens.elevationBar,
-        sheen = 0.14f
+        alpha = 0.72f,
+        frost = VennelaTokens.frostHeavy,
+        elevation = VennelaTokens.elevationDock,
+        sheen = 0.24f,
+        highlight = 0.20f
     )
     Row(
         modifier = modifier
             .windowInsetsPadding(WindowInsets.navigationBars)
-            .padding(horizontal = VennelaTokens.spaceSm, vertical = VennelaTokens.spaceXs)
+            .padding(horizontal = VennelaTokens.spaceSm, vertical = 6.dp)
             .liquidGlass(spec, RoundedCornerShape(VennelaTokens.radiusPill))
-            .padding(horizontal = VennelaTokens.spaceSm, vertical = VennelaTokens.spaceXs),
+            .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(VennelaTokens.spaceXs)
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         if (!status.isNullOrBlank()) {
             Text(
                 text = status,
                 color = palette.textSecondary,
-                fontSize = VennelaTokens.nano,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 4.dp)
             )
-            Spacer(modifier = Modifier.width(VennelaTokens.spaceXs))
         }
         content()
     }

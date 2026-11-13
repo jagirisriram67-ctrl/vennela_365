@@ -2,21 +2,129 @@ package com.vennela365.viewer.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vennela365.viewer.R
 
 /**
- * Vennela 365 design tokens — Nebula Flux edition.
+ * App-wide typography presets, defaulting to OnePlus Sans (OxygenOS 15 geometric
+ * humanist display + razor-sharp Inter body legibility).
+ */
+enum class AppFontStyle(
+    val id: String,
+    val label: String,
+    val badge: String,
+    val subtitle: String
+) {
+    ONEPLUS_SANS(
+        id = "oneplus_sans",
+        label = "OnePlus Sans",
+        badge = "1+ Sans",
+        subtitle = "OxygenOS 15 geometric display + ultra-clean humanist text"
+    ),
+    GOOGLE_WORKSPACE(
+        id = "google_sans",
+        label = "Google Workspace Sans",
+        badge = "G Sans",
+        subtitle = "Rounded geometric workspace typography"
+    ),
+    EDITORIAL_SERIF(
+        id = "editorial_serif",
+        label = "Editorial Book Serif",
+        badge = "Serif",
+        subtitle = "High-contrast book and magazine reading typography"
+    ),
+    DEVELOPER_MONO(
+        id = "developer_mono",
+        label = "JetBrains Tabular Mono",
+        badge = "Mono",
+        subtitle = "Precision monospaced technical typography"
+    );
+
+    val title: String get() = label
+
+    companion object {
+        fun fromId(id: String?): AppFontStyle =
+            entries.firstOrNull { it.id == id } ?: ONEPLUS_SANS
+    }
+}
+
+/**
+ * Curated variable fonts bundled directly in res/font:
+ * - OnePlusSans / Sans: Outfit geometric display weights + Inter humanist body weights
+ *   modeled after OnePlus Slate / OnePlus Sans (OxygenOS 15).
+ * - PlusJakarta: Plus Jakarta Sans for Google Workspace / rounded UI.
+ * - Serif: Newsreader for editorial document headlines & long-form prose.
+ * - Mono: JetBrains Mono for code blocks, formula bars, and binary/hex inspectors.
+ */
+object VennelaFonts {
+    val OnePlusDisplay: FontFamily = FontFamily(
+        Font(R.font.outfit, FontWeight.Normal),
+        Font(R.font.outfit, FontWeight.Medium),
+        Font(R.font.outfit, FontWeight.SemiBold),
+        Font(R.font.outfit, FontWeight.Bold),
+        Font(R.font.outfit, FontWeight.ExtraBold)
+    )
+
+    val OnePlusBody: FontFamily = FontFamily(
+        Font(R.font.inter, FontWeight.Normal),
+        Font(R.font.inter, FontWeight.Medium),
+        Font(R.font.outfit, FontWeight.SemiBold),
+        Font(R.font.outfit, FontWeight.Bold),
+        Font(R.font.outfit, FontWeight.ExtraBold)
+    )
+
+    val PlusJakarta: FontFamily = FontFamily(
+        Font(R.font.plus_jakarta_sans, FontWeight.Normal),
+        Font(R.font.plus_jakarta_sans, FontWeight.Medium),
+        Font(R.font.plus_jakarta_sans, FontWeight.SemiBold),
+        Font(R.font.plus_jakarta_sans, FontWeight.Bold),
+        Font(R.font.plus_jakarta_sans, FontWeight.ExtraBold)
+    )
+
+    /** Default app-wide font family: OnePlus Sans (Outfit + Inter). */
+    val Sans: FontFamily = OnePlusBody
+
+    val Serif: FontFamily = FontFamily(
+        Font(R.font.newsreader, FontWeight.Normal),
+        Font(R.font.newsreader, FontWeight.Medium),
+        Font(R.font.newsreader, FontWeight.SemiBold),
+        Font(R.font.newsreader, FontWeight.Bold)
+    )
+
+    val Mono: FontFamily = FontFamily(
+        Font(R.font.jetbrains_mono, FontWeight.Normal),
+        Font(R.font.jetbrains_mono, FontWeight.Medium),
+        Font(R.font.jetbrains_mono, FontWeight.SemiBold),
+        Font(R.font.jetbrains_mono, FontWeight.Bold)
+    )
+
+    fun familyFor(style: AppFontStyle): FontFamily = when (style) {
+        AppFontStyle.ONEPLUS_SANS -> OnePlusBody
+        AppFontStyle.GOOGLE_WORKSPACE -> PlusJakarta
+        AppFontStyle.EDITORIAL_SERIF -> Serif
+        AppFontStyle.DEVELOPER_MONO -> Mono
+    }
+
+    fun displayFamilyFor(style: AppFontStyle): FontFamily = when (style) {
+        AppFontStyle.ONEPLUS_SANS -> OnePlusDisplay
+        AppFontStyle.GOOGLE_WORKSPACE -> PlusJakarta
+        AppFontStyle.EDITORIAL_SERIF -> Serif
+        AppFontStyle.DEVELOPER_MONO -> Mono
+    }
+}
+
+/**
+ * Vennela 365 design tokens.
  *
  * Single source of truth for radii, spacing, type, elevation, and motion.
- * Enlarged corner radii for the liquid-glass language; new animation tokens
- * for magnetic spring physics, entrance choreography, and neon glow pulses.
  */
 object VennelaTokens {
 
-    // ---- Radii (liquid-glass curvature, tuned so surfaces read compact) ----
+    // ---- Radii (liquid-glass curvature) ---------------------------------
     val radiusChip = 14.dp
     val radiusBadge = 16.dp
     val radiusControl = 18.dp
@@ -38,35 +146,30 @@ object VennelaTokens {
     val spaceHuge = 40.dp
 
     /** Standard horizontal page gutter. */
-    val gutter = 14.dp
+    val gutter = 16.dp
 
     // ---- Layout --------------------------------------------------------
     val touchTargetMin = 48.dp
     val touchTargetCompact = 36.dp
-    val iconSm = 15.dp
-    val iconMd = 18.dp
+    val iconSm = 16.dp
+    val iconMd = 19.dp
     val iconLg = 22.dp
     val iconXl = 26.dp
     val badgeXs = 26.dp
-    val badgeSm = 32.dp
-    val badgeMd = 38.dp
-    val badgeLg = 44.dp
+    val badgeSm = 34.dp
+    val badgeMd = 40.dp
+    val badgeLg = 46.dp
 
-    // ---- Viewer chrome (compact, content-first) -------------------------
-    val viewerBar = 40.dp
-    val viewerDock = 42.dp
-    val viewerControl = 30.dp
-    val viewerIcon = 18.dp
-    val viewerTopInset = 48.dp
-    val viewerSheetPadding = 14.dp
+    // ---- Viewer chrome (content-first, effortless touch ergonomics) -----
+    val viewerBar = 52.dp
+    val viewerDock = 54.dp
+    val viewerControl = 36.dp
+    val viewerIcon = 19.dp
+    val viewerTopInset = 54.dp
+    val viewerSheetPadding = 16.dp
 
-    /**
-     * The one size every compact icon button uses.
-     *
-     * 32dp is the smallest footprint that still reads as a comfortable target
-     * on a phone, and it fits inside a 40dp bar without inflating it.
-     */
-    val controlSm = 32.dp
+    /** Compact icon button diameter matching inside viewerBar cleanly. */
+    val controlSm = 36.dp
 
     // ---- Type scale ----------------------------------------------------
     val titleHero = 30.sp
@@ -93,130 +196,117 @@ object VennelaTokens {
     val frostRegular = 22.dp
     val frostHeavy = 34.dp
 
-    // ---- NEW: Magnetic Spring Physics ----------------------------------
-    /** Damping ratio for press feedback (under-damped bounce). */
-    val springDampingPress = 0.55f
-    /** Stiffness for press animations (lower = softer spring). */
-    val springStiffnessPress = 400f
-    /** Scale factor on press-down (slight shrink). */
-    val pressScaleDown = 0.94f
-    /** Rotation degrees added on press for magnetic tilt. */
-    val pressRotationDeg = 1.2f
+    // ---- Magnetic Spring Physics ---------------------------------------
+    val springDampingPress = 0.62f
+    val springStiffnessPress = 520f
+    val pressScaleDown = 0.955f
+    val pressRotationDeg = 0.8f
 
-    /** Damping for entrance reveal springs. */
-    val springDampingEntrance = 0.72f
-    /** Stiffness for entrance reveal springs. */
-    val springStiffnessEntrance = 300f
+    val springDampingEntrance = 0.78f
+    val springStiffnessEntrance = 340f
 
-    // ---- NEW: Entrance Choreography ------------------------------------
-    /** Base delay between staggered item entrances. */
-    val entranceStaggerMs = 40
-    /** Duration of fade-in for entrance animations. */
-    val entranceFadeDurationMs = 220
-    /** Initial Y-offset for entrance slide-up (dp). */
-    val entranceSlideOffsetY = 24.dp
-    /** Initial scale for entrance zoom-in. */
-    val entranceScaleStart = 0.92f
+    // ---- Entrance Choreography -----------------------------------------
+    val entranceStaggerMs = 32
+    val entranceFadeDurationMs = 200
+    val entranceSlideOffsetY = 20.dp
+    val entranceScaleStart = 0.94f
 
-    // ---- NEW: Neon Pulse Glow ------------------------------------------
-    /** Glow radius for active / focused neon pulse. */
+    // ---- Neon Pulse Glow -----------------------------------------------
     val glowRadiusActive = 16.dp
-    /** Glow radius for subtle ambient neon halo. */
     val glowRadiusAmbient = 8.dp
-    /** Duration of one breathing glow cycle (ms). */
     val glowPulseDurationMs = 2400
-    /** Alpha range for glow pulse: low end. */
     val glowPulseAlphaLow = 0.25f
-    /** Alpha range for glow pulse: high end. */
     val glowPulseAlphaHigh = 0.65f
 
-    // ---- NEW: Liquid Border Gradient -----------------------------------
-    /** Alpha of the bright (top-left) end of a liquid border. */
-    val liquidBorderAlphaBright = 0.60f
-    /** Alpha of the transparent (bottom-right) end. */
+    // ---- Liquid Border Gradient ----------------------------------------
+    val liquidBorderAlphaBright = 0.56f
     val liquidBorderAlphaFade = 0.08f
 
-    // ---- NEW: Chromatic Depth Layers -----------------------------------
-    /** Saturation boost factor per depth level (0 = surface, deeper = more). */
+    // ---- Chromatic Depth Layers ----------------------------------------
     val depthSaturationStep = 0.06f
-    /** Number of distinct depth levels used for surface layering. */
     val depthLevels = 4
 }
 
 /**
- * Typography tuned for legibility on low-end panels: larger minimum sizes and
- * generous line heights than the Material defaults, with no downloaded fonts so
- * the APK stays small and rendering stays instant.
+ * Builds the Material 3 Typography for the active [AppFontStyle], defaulting
+ * to OnePlus Sans (Outfit geometric display + Inter humanist body).
  */
-val VennelaTypography = Typography(
-    displayLarge = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Bold,
-        fontSize = 34.sp,
-        lineHeight = 40.sp,
-        letterSpacing = (-0.5).sp
-    ),
-    headlineMedium = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Bold,
-        fontSize = VennelaTokens.titleDisplay,
-        lineHeight = 32.sp,
-        letterSpacing = (-0.3).sp
-    ),
-    titleLarge = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Bold,
-        fontSize = VennelaTokens.titleLarge,
-        lineHeight = 28.sp,
-        letterSpacing = (-0.2).sp
-    ),
-    titleMedium = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = VennelaTokens.titleMedium,
-        lineHeight = 23.sp
-    ),
-    titleSmall = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = VennelaTokens.titleSmall,
-        lineHeight = 20.sp
-    ),
-    bodyLarge = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Normal,
-        fontSize = 16.sp,
-        lineHeight = 24.sp
-    ),
-    bodyMedium = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Normal,
-        fontSize = VennelaTokens.body,
-        lineHeight = 22.sp
-    ),
-    bodySmall = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Normal,
-        fontSize = VennelaTokens.bodySmall,
-        lineHeight = 19.sp
-    ),
-    labelLarge = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 14.sp,
-        lineHeight = 18.sp
-    ),
-    labelMedium = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Medium,
-        fontSize = VennelaTokens.caption,
-        lineHeight = 16.sp
-    ),
-    labelSmall = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Medium,
-        fontSize = VennelaTokens.micro,
-        lineHeight = 14.sp,
-        letterSpacing = 0.2.sp
+fun vennelaTypographyFor(style: AppFontStyle = AppFontStyle.ONEPLUS_SANS): Typography {
+    val display = VennelaFonts.displayFamilyFor(style)
+    val body = VennelaFonts.familyFor(style)
+    return Typography(
+        displayLarge = TextStyle(
+            fontFamily = display,
+            fontWeight = FontWeight.Bold,
+            fontSize = 34.sp,
+            lineHeight = 40.sp,
+            letterSpacing = (-0.5).sp
+        ),
+        headlineMedium = TextStyle(
+            fontFamily = display,
+            fontWeight = FontWeight.Bold,
+            fontSize = VennelaTokens.titleDisplay,
+            lineHeight = 32.sp,
+            letterSpacing = (-0.35).sp
+        ),
+        titleLarge = TextStyle(
+            fontFamily = display,
+            fontWeight = FontWeight.Bold,
+            fontSize = VennelaTokens.titleLarge,
+            lineHeight = 28.sp,
+            letterSpacing = (-0.2).sp
+        ),
+        titleMedium = TextStyle(
+            fontFamily = display,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = VennelaTokens.titleMedium,
+            lineHeight = 23.sp,
+            letterSpacing = (-0.1).sp
+        ),
+        titleSmall = TextStyle(
+            fontFamily = display,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = VennelaTokens.titleSmall,
+            lineHeight = 20.sp
+        ),
+        bodyLarge = TextStyle(
+            fontFamily = body,
+            fontWeight = FontWeight.Normal,
+            fontSize = 16.sp,
+            lineHeight = 24.sp
+        ),
+        bodyMedium = TextStyle(
+            fontFamily = body,
+            fontWeight = FontWeight.Normal,
+            fontSize = VennelaTokens.body,
+            lineHeight = 22.sp
+        ),
+        bodySmall = TextStyle(
+            fontFamily = body,
+            fontWeight = FontWeight.Normal,
+            fontSize = VennelaTokens.bodySmall,
+            lineHeight = 19.sp
+        ),
+        labelLarge = TextStyle(
+            fontFamily = display,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 14.sp,
+            lineHeight = 18.sp
+        ),
+        labelMedium = TextStyle(
+            fontFamily = body,
+            fontWeight = FontWeight.Medium,
+            fontSize = VennelaTokens.caption,
+            lineHeight = 16.sp
+        ),
+        labelSmall = TextStyle(
+            fontFamily = body,
+            fontWeight = FontWeight.Medium,
+            fontSize = VennelaTokens.micro,
+            lineHeight = 14.sp,
+            letterSpacing = 0.2.sp
+        )
     )
-)
+}
+
+val VennelaTypography = vennelaTypographyFor(AppFontStyle.ONEPLUS_SANS)

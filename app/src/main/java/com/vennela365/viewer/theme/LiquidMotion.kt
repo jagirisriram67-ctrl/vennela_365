@@ -33,36 +33,36 @@ object LiquidMotion {
 
     // ---- Durations -----------------------------------------------------
 
-    const val durationInstant = 90
-    const val durationFast = 180
-    const val durationBase = 280
-    const val durationSlow = 420
-    const val durationHero = 620
+    const val durationInstant = 80
+    const val durationFast = 160
+    const val durationBase = 240
+    const val durationSlow = 360
+    const val durationHero = 520
 
     // ---- Liquid springs ------------------------------------------------
 
-    /** Touch feedback. Snappy, minimal overshoot. */
+    /** Touch feedback: crisp, immediate response with subtle elastic settle. */
     fun <T> press(): FiniteAnimationSpec<T> = spring(
-        dampingRatio = 0.62f,
+        dampingRatio = 0.68f,
         stiffness = Spring.StiffnessHigh
     )
 
-    /** Surface that grows/settles, e.g. a sheet or an expanding card. */
+    /** Surface that grows/settles, e.g. a sheet or expanding card. */
     fun <T> liquid(): SpringSpec<T> = spring(
-        dampingRatio = 0.78f,
-        stiffness = Spring.StiffnessMediumLow
+        dampingRatio = 0.82f,
+        stiffness = Spring.StiffnessMedium
     )
 
     /** Bouncier sibling for celebratory, low-frequency moves. */
     fun <T> playful(): SpringSpec<T> = spring(
         dampingRatio = Spring.DampingRatioLowBouncy,
-        stiffness = Spring.StiffnessLow
+        stiffness = Spring.StiffnessMediumLow
     )
 
-    /** Screen and dock transitions: smooth with a whisper of overshoot. */
+    /** Screen and dock transitions: ultra-smooth critically damped glide. */
     fun <T> shared(): SpringSpec<T> = spring(
-        dampingRatio = 0.86f,
-        stiffness = Spring.StiffnessMediumLow
+        dampingRatio = 0.88f,
+        stiffness = 460f
     )
 
     // ---- Glide tweens --------------------------------------------------
@@ -78,16 +78,16 @@ object LiquidMotion {
 
     // ---- Aurora upgrade additions ---------------------------------------
 
-    /** Hero surfaces: slower, airier, with a generous overshoot. */
+    /** Hero surfaces: smooth, balanced overshoot. */
     fun <T> hero(): SpringSpec<T> = spring(
-        dampingRatio = Spring.DampingRatioMediumBouncy,
-        stiffness = 240f
+        dampingRatio = 0.72f,
+        stiffness = 380f
     )
 
-    /** Celebratory bounce for rewards and "wow" moments. */
+    /** Celebratory bounce for rewards and highlights. */
     fun <T> bounce(): SpringSpec<T> = spring(
         dampingRatio = Spring.DampingRatioLowBouncy,
-        stiffness = Spring.StiffnessVeryLow
+        stiffness = Spring.StiffnessMediumLow
     )
 
     /** Sheen sweeps and shimmer loops. */
@@ -95,16 +95,15 @@ object LiquidMotion {
         tween(durationMillis = duration, easing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f))
 
     /**
-     * Staggered list cascade: one spec per index so rows ripple into view.
-     * The delay is clamped so long lists still settle quickly.
+     * Staggered list cascade: crisp tight stagger so lists snap into focus immediately.
      */
     fun <T> cascade(
         index: Int,
-        stepMillis: Int = 46,
+        stepMillis: Int = 30,
         duration: Int = durationBase
     ): TweenSpec<T> = tween(
         durationMillis = duration,
-        delayMillis = (index.coerceAtMost(10) * stepMillis),
+        delayMillis = (index.coerceAtMost(8) * stepMillis),
         easing = glideEasing
     )
 }

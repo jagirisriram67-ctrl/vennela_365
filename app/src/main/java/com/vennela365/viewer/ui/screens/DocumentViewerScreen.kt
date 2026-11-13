@@ -4,6 +4,19 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.graphics.Paint
+import android.graphics.pdf.PdfDocument
+import android.os.Bundle
+import android.os.CancellationSignal
+import android.os.ParcelFileDescriptor
+import android.print.PageRange
+import android.print.PrintAttributes
+import android.print.PrintDocumentAdapter
+import android.print.PrintDocumentInfo
+import android.print.PrintManager
+import android.text.Layout
+import android.text.StaticLayout
+import android.text.TextPaint
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -39,6 +52,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
@@ -64,6 +78,8 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.filled.Search
@@ -105,6 +121,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
@@ -114,6 +131,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
@@ -123,6 +141,7 @@ import com.vennela365.viewer.storage.ShareUri
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
 import com.vennela365.viewer.theme.LiquidMotion
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.theme.ViewerColorMode
 import com.vennela365.viewer.theme.applyViewerColorMode
@@ -144,19 +163,30 @@ import com.vennela365.viewer.ui.components.RadarTick
 import com.vennela365.viewer.ui.components.RadarTickType
 import com.vennela365.viewer.ui.components.SplitHorizonViewer
 import com.vennela365.viewer.ui.components.StudySheetCompilerView
+import com.vennela365.viewer.ui.components.SuiteCommandHeader
+import com.vennela365.viewer.ui.components.SuiteFooterStatusBar
+import com.vennela365.viewer.ui.components.SuitePaperContainer
 import com.vennela365.viewer.ui.components.ViewerDock
 import com.vennela365.viewer.ui.components.ViewerDockAction
 import com.vennela365.viewer.ui.components.ViewerIconAction
+import com.vennela365.viewer.ui.components.ViewerKind
+import com.vennela365.viewer.ui.components.ViewerSuiteStyle
 import com.vennela365.viewer.ui.components.ViewerTopBar
 import com.vennela365.viewer.ui.components.VennelaEmptyState
 import com.vennela365.viewer.ui.components.VennelaErrorState
+import com.vennela365.viewer.ui.components.WpsPaperTone
 import com.vennela365.viewer.ui.components.pressScale
+import com.vennela365.viewer.ui.components.rememberSuiteSessionState
 import com.vennela365.viewer.viewmodel.MainViewModel
 import com.vennela365.viewer.viewmodel.Screen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.io.OutputStream
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 
@@ -181,6 +211,18 @@ private val DocBaseLineHeight = 23f
 private enum class DocPanel(val label: String) {
     NONE("none"), TEXT("Type & spacing"), CONTENT("Contents"), ZOOM("Zoom"),
     VIEW("Reading view"), MORE("Tools"), INFO("File information")
+}
+
+private enum class DocFontChoice(val label: String, val family: FontFamily) {
+    SANS("OnePlus Sans", VennelaFonts.Sans),
+    SERIF("Editorial Serif", VennelaFonts.Serif),
+    MONO("Code Mono", VennelaFonts.Mono)
+}
+
+private enum class DocMarginChoice(val label: String, val horizontal: Dp) {
+    COMPACT("Narrow", 12.dp),
+    NORMAL("Standard", 20.dp),
+    WIDE("Wide", 28.dp)
 }
 
 /** A chip rail entry, so rails stay data-driven instead of hand-unrolled. */
@@ -308,6 +350,136 @@ private class LayoutFloat(initial: Float = 0f) {
     var value: Float = initial
 }
 
+/**
+ * Generates a paginated PDF from the document title and extracted body text
+ * using the built-in Android [PdfDocument] and [StaticLayout] APIs (0 KB extra).
+ */
+private fun writeGeneratedPdf(
+    title: String,
+    subtitle: String,
+    bodyText: String,
+    outputStream: OutputStream
+) {
+    val pageWidth = 595
+    val pageHeight = 842
+    val margin = 46f
+    val contentWidth = (pageWidth - margin * 2).toInt()
+
+    val titlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.rgb(22, 26, 36)
+        textSize = 18f
+        isFakeBoldText = true
+    }
+    val subPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.rgb(100, 112, 130)
+        textSize = 9.5f
+    }
+    val bodyPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.rgb(34, 38, 48)
+        textSize = 11.2f
+    }
+    val rulePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.rgb(212, 218, 230)
+        strokeWidth = 1f
+    }
+
+    val safeBody = bodyText.ifBlank { "No readable text layer extracted from this file." }.take(120_000)
+    val layout = StaticLayout.Builder.obtain(safeBody, 0, safeBody.length, bodyPaint, contentWidth)
+        .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+        .setLineSpacing(2.5f, 1.18f)
+        .build()
+
+    val pdf = PdfDocument()
+    try {
+        val totalLines = layout.lineCount
+        var lineIndex = 0
+        var pageNumber = 1
+
+        while (lineIndex < totalLines || pageNumber == 1) {
+            val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
+            val page = pdf.startPage(pageInfo)
+            val canvas = page.canvas
+            canvas.drawColor(android.graphics.Color.WHITE)
+
+            var y = margin + 8f
+            if (pageNumber == 1) {
+                canvas.drawText(title.take(54), margin, y, titlePaint)
+                y += 16f
+                canvas.drawText(subtitle.take(72), margin, y, subPaint)
+                y += 10f
+                canvas.drawLine(margin, y, pageWidth - margin, y, rulePaint)
+                y += 18f
+            } else {
+                canvas.drawText(title.take(48), margin, y - 4f, subPaint)
+                y += 12f
+            }
+
+            val maxBottom = pageHeight - margin - 18f
+            while (lineIndex < totalLines) {
+                val lineHeightPx = (layout.getLineBottom(lineIndex) - layout.getLineTop(lineIndex)).toFloat()
+                if (y + lineHeightPx > maxBottom) break
+                val start = layout.getLineStart(lineIndex)
+                val rawEnd = layout.getLineEnd(lineIndex)
+                val end = if (rawEnd > start && safeBody[rawEnd - 1] == '\n') rawEnd - 1 else rawEnd
+                if (end > start) {
+                    canvas.drawText(safeBody, start, end, margin, y - layout.getLineAscent(lineIndex), bodyPaint)
+                }
+                y += lineHeightPx
+                lineIndex++
+            }
+
+            canvas.drawText("Vennela 365  •  Page $pageNumber", margin, pageHeight - 22f, subPaint)
+            pdf.finishPage(page)
+            pageNumber++
+            if (lineIndex >= totalLines) break
+        }
+        pdf.writeTo(outputStream)
+        outputStream.flush()
+    } finally {
+        pdf.close()
+    }
+}
+
+private class DocPdfPrintAdapter(private val source: File, private val jobName: String) : PrintDocumentAdapter() {
+    override fun onLayout(
+        oldAttributes: PrintAttributes?,
+        newAttributes: PrintAttributes?,
+        cancellationSignal: CancellationSignal?,
+        callback: LayoutResultCallback?,
+        extras: Bundle?
+    ) {
+        if (cancellationSignal?.isCanceled == true) {
+            callback?.onLayoutCancelled()
+            return
+        }
+        val info = PrintDocumentInfo.Builder(jobName)
+            .setContentType(PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
+            .setPageCount(PrintDocumentInfo.PAGE_COUNT_UNKNOWN)
+            .build()
+        callback?.onLayoutFinished(info, newAttributes != oldAttributes)
+    }
+
+    override fun onWrite(
+        pages: Array<out PageRange>?,
+        destination: ParcelFileDescriptor?,
+        cancellationSignal: CancellationSignal?,
+        callback: WriteResultCallback?
+    ) {
+        if (destination == null) {
+            callback?.onWriteFailed("No print destination")
+            return
+        }
+        try {
+            FileInputStream(source).use { input ->
+                FileOutputStream(destination.fileDescriptor).use { output -> input.copyTo(output) }
+            }
+            callback?.onWriteFinished(arrayOf(PageRange.ALL_PAGES))
+        } catch (e: Exception) {
+            callback?.onWriteFailed(e.message ?: "Print write error")
+        }
+    }
+}
+
 /* ------------------------------------------------------------------------- */
 /* Screen                                                                     */
 /* ------------------------------------------------------------------------- */
@@ -342,6 +514,8 @@ fun DocumentViewerScreen(viewModel: MainViewModel) {
     val enableMicroLouvre by viewModel.enableMicroLouvre.collectAsState()
     val isStudySheetActive by viewModel.isStudySheetActive.collectAsState()
     val isLightboxActive by viewModel.isLightboxActive.collectAsState()
+    val activeSuite by viewModel.preferredSuiteStyle.collectAsState()
+    val suiteSession = rememberSuiteSessionState(activeSuite, palette.isDark)
 
     val scope = rememberCoroutineScope()
     val fileKey = selectedFile?.id ?: "no-doc"
@@ -351,6 +525,8 @@ fun DocumentViewerScreen(viewModel: MainViewModel) {
     var textScale by rememberSaveable(fileKey) { mutableStateOf(saved.typeScale) }
     var lineScale by rememberSaveable(fileKey) { mutableStateOf(saved.lineScale) }
     var zoom by rememberSaveable(fileKey) { mutableStateOf(saved.zoom) }
+    var fontChoice by rememberSaveable(fileKey) { mutableStateOf(DocFontChoice.SANS) }
+    var marginChoice by rememberSaveable(fileKey) { mutableStateOf(DocMarginChoice.NORMAL) }
     var panel by remember { mutableStateOf(DocPanel.NONE) }
     var keepScreenOn by rememberSaveable { mutableStateOf(false) }
     var findActive by remember { mutableStateOf(false) }
@@ -387,7 +563,20 @@ fun DocumentViewerScreen(viewModel: MainViewModel) {
             DocReadingMemory.update(fileKey) { it.with(scroll = offset) }
         }
     }
-    DocKeepScreenFlag(keepScreenOn)
+    // WPS Super / Microsoft 365 hands-free teleprompter auto-scroll
+    LaunchedEffect(suiteSession.autoScrollActive, suiteSession.autoScrollSpeed, scrollState.maxValue) {
+        while (suiteSession.autoScrollActive && scrollState.maxValue > 0) {
+            val stepPx = (2.2f * suiteSession.autoScrollSpeed).roundToInt().coerceAtLeast(1)
+            val next = (scrollState.value + stepPx).coerceAtMost(scrollState.maxValue)
+            scrollState.scrollTo(next)
+            if (next >= scrollState.maxValue) {
+                suiteSession.autoScrollActive = false
+                break
+            }
+            delay(32L)
+        }
+    }
+    DocKeepScreenFlag(keepScreenOn || suiteSession.autoScrollActive)
 
     // Heading / anomaly ticks, cached per file so reopening is instant.
     val radarTicks = remember(fileKey, extractedText) {
@@ -435,10 +624,20 @@ fun DocumentViewerScreen(viewModel: MainViewModel) {
     }
     val safeFindIndex = if (matches.isEmpty()) 0 else findIndex.coerceIn(0, matches.lastIndex)
 
+    val suitePaperTone = remember(activeSuite, suiteSession.paperTone, viewerColorMode) {
+        when {
+            activeSuite == ViewerSuiteStyle.WPS_SUPER -> suiteSession.paperTone
+            viewerColorMode == ViewerColorMode.SEPIA -> WpsPaperTone.WARM_PARCHMENT
+            viewerColorMode == ViewerColorMode.OKLAB_DARK -> WpsPaperTone.NIGHT_OBSIDIAN
+            else -> WpsPaperTone.CRISP_WHITE
+        }
+    }
+    val suiteBrandAccent = remember(activeSuite) { ViewerKind.DOCS.accentFor(activeSuite) }
+
     // Rich, Docs-like markup: headings, lists, quotes and tables are recovered
     // from the text layer, while find hits are mapped back to source offsets.
     val annotatedBody = remember(
-        activeDisplayText, matches, safeFindIndex, accent, palette, findQuery, fontSize, lineHeight
+        activeDisplayText, matches, safeFindIndex, suiteBrandAccent, suitePaperTone, findQuery, fontSize, lineHeight, fontChoice
     ) {
         val highlights = if (matches.isEmpty()) {
             emptyList()
@@ -455,11 +654,14 @@ fun DocumentViewerScreen(viewModel: MainViewModel) {
             source = activeDisplayText,
             typography = DocumentMarkup.Typography(
                 bodySize = fontSize,
-                ink = palette.textPrimary,
-                muted = palette.textSecondary,
-                accent = accent.primary,
-                tableTint = accent.primary.copy(alpha = 0.10f),
-                isDarkPaper = palette.isDark
+                ink = suitePaperTone.inkColor,
+                muted = suitePaperTone.mutedInkColor,
+                accent = suiteBrandAccent,
+                tableTint = suiteBrandAccent.copy(alpha = 0.10f),
+                isDarkPaper = suitePaperTone == WpsPaperTone.NIGHT_OBSIDIAN,
+                headingFont = if (fontChoice == DocFontChoice.MONO) VennelaFonts.Mono else VennelaFonts.OnePlusDisplay,
+                bodyFont = fontChoice.family,
+                monoFont = VennelaFonts.Mono
             ),
             highlights = highlights
         )
@@ -532,6 +734,29 @@ fun DocumentViewerScreen(viewModel: MainViewModel) {
         }
     }
 
+    val exportPdfLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/pdf")
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val payload = if (activeDisplayText.isNotBlank()) activeDisplayText else extractedText
+        val sub = "${selectedFile?.formatInfo?.name ?: "Document"} • ${stats.words} words"
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openOutputStream(uri)?.use { out ->
+                        writeGeneratedPdf(fileName, sub, payload, out)
+                    }
+                    true
+                }.getOrDefault(false)
+            }
+            Toast.makeText(
+                context,
+                if (ok) "Exported PDF for $fileName" else "Could not export PDF",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
     val mime = selectedFile?.formatInfo?.mimeType?.takeIf { it.isNotBlank() } ?: "text/plain"
 
     fun toast(message: String) = Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
@@ -551,6 +776,31 @@ fun DocumentViewerScreen(viewModel: MainViewModel) {
             ?: return toast("This file's location cannot be handed to another app")
         runCatching { context.startActivity(Intent.createChooser(intent, "Open with")) }
             .onFailure { toast("No app on this device can open this document") }
+    }
+
+    fun printDocument() {
+        val payload = if (activeDisplayText.isNotBlank()) activeDisplayText else extractedText
+        val sub = "${selectedFile?.formatInfo?.name ?: "Document"} • ${stats.words} words"
+        scope.launch {
+            val pdfFile = withContext(Dispatchers.IO) {
+                runCatching {
+                    val safeName = fileName.replace(Regex("[^A-Za-z0-9._-]"), "_").take(36)
+                    File(context.cacheDir, "vennela_doc_print_$safeName.pdf").also { target ->
+                        FileOutputStream(target).use { out ->
+                            writeGeneratedPdf(fileName, sub, payload, out)
+                        }
+                    }
+                }.getOrNull()
+            }
+            if (pdfFile == null || !pdfFile.exists()) {
+                return@launch toast("Could not prepare document for printing")
+            }
+            val manager = context.getSystemService(Context.PRINT_SERVICE) as? PrintManager
+                ?: return@launch toast("Print service is unavailable on this device")
+            runCatching {
+                manager.print(fileName, DocPdfPrintAdapter(pdfFile, fileName), PrintAttributes.Builder().build())
+            }.onFailure { toast("Could not start print job") }
+        }
     }
 
     val zoomChips = listOf(
@@ -585,6 +835,11 @@ fun DocumentViewerScreen(viewModel: MainViewModel) {
         DocChip("Keep screen on", Icons.Default.Visibility, keepScreenOn) { keepScreenOn = !keepScreenOn },
         DocChip("Share", Icons.Default.Share) { shareDocument() },
         DocChip("Open with", Icons.AutoMirrored.Filled.OpenInNew) { openWith() },
+        DocChip("Export as PDF", Icons.Default.PictureAsPdf) {
+            val base = fileName.substringBeforeLast('.').ifBlank { "vennela-document" }
+            exportPdfLauncher.launch("$base.pdf")
+        },
+        DocChip("Print document", Icons.Default.Print) { printDocument() },
         DocChip("Save a copy", Icons.Default.SaveAlt) {
             saveLauncher.launch(selectedFile?.name ?: "vennela-document.txt")
         },
@@ -666,11 +921,26 @@ fun DocumentViewerScreen(viewModel: MainViewModel) {
                         )
                         Spacer(Modifier.height(VennelaTokens.spaceSm))
                         DocChipRail(
-                            listOf(
-                                DocChip("Compact", active = lineScale < 1.05f) { lineScale = 0.95f },
-                                DocChip("Cozy", active = lineScale in 1.05f..1.35f) { lineScale = 1.2f },
-                                DocChip("Airy", active = lineScale > 1.35f) { lineScale = 1.5f },
-                                DocChip("Reset type") { textScale = 1f; lineScale = 1f }
+                            DocFontChoice.entries.map { choice ->
+                                DocChip(choice.label, active = fontChoice == choice) { fontChoice = choice }
+                            }
+                        )
+                        Spacer(Modifier.height(VennelaTokens.spaceXs))
+                        DocChipRail(
+                            DocMarginChoice.entries.map { margin ->
+                                DocChip("${margin.label} margins", active = marginChoice == margin) {
+                                    marginChoice = margin
+                                }
+                            } + listOf(
+                                DocChip("Compact lines", active = lineScale < 1.05f) { lineScale = 0.95f },
+                                DocChip("Cozy lines", active = lineScale in 1.05f..1.35f) { lineScale = 1.2f },
+                                DocChip("Airy lines", active = lineScale > 1.35f) { lineScale = 1.5f },
+                                DocChip("Reset type") {
+                                    textScale = 1f
+                                    lineScale = 1f
+                                    fontChoice = DocFontChoice.SANS
+                                    marginChoice = DocMarginChoice.NORMAL
+                                }
                             )
                         )
                     }
@@ -775,7 +1045,7 @@ fun DocumentViewerScreen(viewModel: MainViewModel) {
                     }
 
                     DocPanel.MORE -> {
-                        DocTrayHeader(Icons.Default.MoreHoriz, "Tools", "pdf printing is not offered here")
+                        DocTrayHeader(Icons.Default.MoreHoriz, "Tools", "Export PDF, print & reading tools")
                         Spacer(Modifier.height(VennelaTokens.spaceSm))
                         DocChipRail(toolChips.drop(4))
                     }
@@ -820,144 +1090,194 @@ fun DocumentViewerScreen(viewModel: MainViewModel) {
         }
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
-            val paneModifier = Modifier
-                .fillMaxSize()
-                .applyViewerColorMode(viewerColorMode)
-                .padding(horizontal = VennelaTokens.gutter)
-                .verticalScroll(scrollState)
-                .onGloballyPositioned { scrollTopInRoot.value = it.positionInRoot().y }
-
-            val bodyPane: @Composable () -> Unit = {
-                Column(paneModifier) {
-                    Spacer(Modifier.height(VennelaTokens.viewerTopInset))
-                    when {
-                        activeDisplayText.isNotBlank() -> RealDocumentCard(
-                            fileName = fileName,
-                            subtitle = selectedFile?.formatInfo?.name ?: "Document",
-                            body = annotatedBody,
-                            truncated = truncated,
-                            fontSize = fontSize,
-                            lineHeight = lineHeight,
-                            onBodyLayout = { bodyLayout = it },
-                            onBodyPositioned = { yInRoot ->
-                                bodyTopInContent.value = yInRoot - scrollTopInRoot.value + scrollState.value
-                            }
-                        )
-
-                        selectedFile?.uri != null && !parseSettled -> DocGlassSkeleton()
-
-                        selectedFile?.uri != null -> VennelaErrorState(
-                            title = "No readable text layer",
-                            message = "This document yielded no text — it may store its layout as binary streams " +
-                                "only. Retrying runs the extractor again; nothing is modified.",
-                            onRetry = { selectedFile?.let { viewModel.openFile(it) } },
-                            onDetails = { viewModel.navigateTo(Screen.FileMetadata) }
-                        )
-
-                        else -> VennelaEmptyState(
-                            title = "No document open",
-                            hint = "Open a document from Files or Recents to read it here.",
-                            icon = Icons.AutoMirrored.Filled.MenuBook,
-                            actionLabel = "Browse files",
-                            onAction = { viewModel.navigateTo(Screen.FileExplorer) }
-                        )
+            Column(Modifier.fillMaxSize()) {
+                SuiteCommandHeader(
+                    kind = ViewerKind.DOCS,
+                    fileName = fileName,
+                    subtitle = buildString {
+                        append(selectedFile?.formatInfo?.name ?: "Document")
+                        if (stats.words > 0) append(" • ${stats.words} words")
+                    },
+                    activeSuite = activeSuite,
+                    onSelectSuite = { viewModel.setPreferredSuiteStyle(it) },
+                    session = suiteSession,
+                    progress = progress,
+                    zoomPercent = (zoom * 100).roundToInt(),
+                    onBack = { viewModel.navigateBack() },
+                    onSearchToggle = {
+                        findActive = !findActive
+                        if (!findActive) findQuery = ""
+                    },
+                    onOutlineToggle = {
+                        panel = if (panel == DocPanel.CONTENT) DocPanel.NONE else DocPanel.CONTENT
+                    },
+                    onShare = { shareDocument() },
+                    onExportPdf = {
+                        val base = fileName.substringBeforeLast('.').ifBlank { "vennela-document" }
+                        exportPdfLauncher.launch("$base.pdf")
+                    },
+                    onPrint = { printDocument() },
+                    onZoomChange = { delta ->
+                        zoom = (zoom + delta).coerceIn(DocMinZoom, DocMaxZoom)
+                    },
+                    onTextScaleChange = { delta ->
+                        textScale = (textScale + delta).coerceIn(DocMinTypeScale, DocMaxTypeScale)
                     }
-                    Spacer(Modifier.height(VennelaTokens.spaceLg))
-                }
-            }
-
-            if (isSplitHorizonActive) {
-                SplitHorizonViewer(
-                    modifier = Modifier.fillMaxSize(),
-                    referenceTitle = "Reference: ${fileName.take(22)}",
-                    onCloseReference = { viewModel.toggleSplitHorizon() },
-                    referenceContent = {
-                        Box(
-                            Modifier.fillMaxSize()
-                                .padding(
-                                    horizontal = VennelaTokens.gutter,
-                                    vertical = VennelaTokens.spaceHuge
-                                )
-                                .verticalScroll(rememberScrollState())
-                        ) {
-                            RealDocumentCard(
-                                fileName = fileName,
-                                subtitle = "Pinned reference",
-                                body = buildAnnotatedString {
-                                    append(
-                                        if (activeDisplayText.isNotBlank()) activeDisplayText.take(900)
-                                        else "Pin a section from the document to compare it here."
-                                    )
-                                },
-                                truncated = false,
-                                fontSize = (13f * textScale * zoom).sp,
-                                lineHeight = (19f * textScale * lineScale * zoom).sp
-                            )
-                        }
-                    },
-                    primaryContent = bodyPane
                 )
-            } else {
-                bodyPane()
-            }
 
-            // ---- Slim floating toolbar (floats over the page) ------------
-            ViewerTopBar(
-                modifier = Modifier.align(Alignment.TopCenter),
-                title = fileName,
-                subtitle = buildString {
-                    append(selectedFile?.formatInfo?.name ?: "Document")
-                    append(" • ${viewerColorMode.title}")
-                    append(" • ${(zoom * 100).roundToInt()}%")
-                },
-                progress = progress,
-                onBack = { viewModel.navigateBack() },
-                actions = {
-                    ViewerIconAction(
-                        Icons.Default.Search,
-                        contentDescription = "Find in document",
-                        active = findActive,
-                        onClick = {
-                            findActive = !findActive
-                            if (!findActive) findQuery = ""
-                        }
-                    )
-                    ViewerIconAction(
-                        Icons.Default.ColorLens,
-                        contentDescription = "Reading theme • ${viewerColorMode.title}",
-                        onClick = { viewModel.cycleViewerColorMode() }
-                    )
-                    ViewerIconAction(
-                        Icons.Default.SaveAlt,
-                        contentDescription = "Save a copy",
-                        onClick = { saveLauncher.launch(selectedFile?.name ?: "vennela-document.txt") }
+                AnimatedVisibility(
+                    visible = findActive,
+                    enter = fadeIn(LiquidMotion.glide()) + expandVertically(LiquidMotion.glide()),
+                    exit = fadeOut(LiquidMotion.exit()) + shrinkVertically(LiquidMotion.exit())
+                ) {
+                    FindInDocumentBar(
+                        query = findQuery,
+                        onQueryChange = { findQuery = it; findIndex = 0 },
+                        matchCount = matches.size,
+                        currentMatch = if (matches.isEmpty()) 0 else safeFindIndex + 1,
+                        onPrevious = {
+                            if (matches.isNotEmpty()) {
+                                findIndex = (safeFindIndex - 1 + matches.size) % matches.size
+                            }
+                        },
+                        onNext = {
+                            if (matches.isNotEmpty()) findIndex = (safeFindIndex + 1) % matches.size
+                        },
+                        onClose = { findActive = false; findQuery = "" }
                     )
                 }
-            )
 
-            // ---- Quick find bar with a real match count ------------------
-            AnimatedVisibility(
-                visible = findActive,
-                enter = fadeIn(LiquidMotion.glide()) + expandVertically(LiquidMotion.glide()),
-                exit = fadeOut(LiquidMotion.exit()) + shrinkVertically(LiquidMotion.exit()),
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = VennelaTokens.viewerTopInset + VennelaTokens.spaceXs)
-            ) {
-                FindInDocumentBar(
-                    query = findQuery,
-                    onQueryChange = { findQuery = it; findIndex = 0 },
-                    matchCount = matches.size,
-                    currentMatch = if (matches.isEmpty()) 0 else safeFindIndex + 1,
-                    onPrevious = {
-                        if (matches.isNotEmpty()) {
-                            findIndex = (safeFindIndex - 1 + matches.size) % matches.size
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    val paneModifier = Modifier
+                        .fillMaxSize()
+                        .applyViewerColorMode(viewerColorMode)
+                        .verticalScroll(scrollState)
+                        .onGloballyPositioned { scrollTopInRoot.value = it.positionInRoot().y }
+
+                    val bodyPane: @Composable () -> Unit = {
+                        Column(paneModifier) {
+                            when {
+                                activeDisplayText.isNotBlank() -> SuitePaperContainer(
+                                    suite = activeSuite,
+                                    session = suiteSession,
+                                    lineCount = stats.lines,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) { paperTone, brandAccent ->
+                                    RealDocumentCard(
+                                        fileName = fileName,
+                                        subtitle = buildString {
+                                            append(activeSuite.badge)
+                                            append("  •  ")
+                                            append(selectedFile?.formatInfo?.name ?: "Document")
+                                            if (stats.words > 0) {
+                                                val mins = (stats.words / 220f).coerceAtLeast(1f).roundToInt()
+                                                append("  •  ${stats.words} words  •  $mins min read")
+                                            }
+                                        },
+                                        body = annotatedBody,
+                                        truncated = truncated,
+                                        horizontalPadding = marginChoice.horizontal,
+                                        fontSize = fontSize,
+                                        lineHeight = lineHeight,
+                                        paperColor = paperTone.paperColor,
+                                        inkColor = paperTone.inkColor,
+                                        mutedInkColor = paperTone.mutedInkColor,
+                                        brandAccent = brandAccent,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("document_paper_card"),
+                                        onBodyLayout = { bodyLayout = it },
+                                        onBodyPositioned = { yInRoot ->
+                                            bodyTopInContent.value = yInRoot - scrollTopInRoot.value + scrollState.value
+                                        }
+                                    )
+                                }
+
+                                selectedFile?.uri != null && !parseSettled -> Box(
+                                    Modifier.padding(VennelaTokens.gutter)
+                                ) { DocGlassSkeleton() }
+
+                                selectedFile?.uri != null -> Box(
+                                    Modifier.padding(VennelaTokens.gutter)
+                                ) {
+                                    VennelaErrorState(
+                                        title = "No readable text layer",
+                                        message = "This document yielded no text — it may store its layout as binary streams " +
+                                            "only. Retrying runs the extractor again; nothing is modified.",
+                                        onRetry = { selectedFile?.let { viewModel.openFile(it) } },
+                                        onDetails = { viewModel.navigateTo(Screen.FileMetadata) }
+                                    )
+                                }
+
+                                else -> Box(
+                                    Modifier.padding(VennelaTokens.gutter)
+                                ) {
+                                    VennelaEmptyState(
+                                        title = "No document open",
+                                        hint = "Open a document from Files or Recents to read it here.",
+                                        icon = Icons.AutoMirrored.Filled.MenuBook,
+                                        actionLabel = "Browse files",
+                                        onAction = { viewModel.navigateTo(Screen.FileExplorer) }
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(VennelaTokens.spaceHuge * 2))
                         }
-                    },
-                    onNext = {
-                        if (matches.isNotEmpty()) findIndex = (safeFindIndex + 1) % matches.size
-                    },
-                    onClose = { findActive = false; findQuery = "" }
+                    }
+
+                    if (isSplitHorizonActive) {
+                        SplitHorizonViewer(
+                            modifier = Modifier.fillMaxSize(),
+                            referenceTitle = "Reference: ${fileName.take(22)}",
+                            onCloseReference = { viewModel.toggleSplitHorizon() },
+                            referenceContent = {
+                                Box(
+                                    Modifier.fillMaxSize()
+                                        .padding(
+                                            horizontal = VennelaTokens.gutter,
+                                            vertical = VennelaTokens.spaceHuge
+                                        )
+                                        .verticalScroll(rememberScrollState())
+                                ) {
+                                    RealDocumentCard(
+                                        fileName = fileName,
+                                        subtitle = "Pinned reference",
+                                        body = buildAnnotatedString {
+                                            append(
+                                                if (activeDisplayText.isNotBlank()) activeDisplayText.take(900)
+                                                else "Pin a section from the document to compare it here."
+                                            )
+                                        },
+                                        truncated = false,
+                                        fontSize = (13f * textScale * zoom).sp,
+                                        lineHeight = (19f * textScale * lineScale * zoom).sp,
+                                        paperColor = suitePaperTone.paperColor,
+                                        inkColor = suitePaperTone.inkColor,
+                                        mutedInkColor = suitePaperTone.mutedInkColor,
+                                        brandAccent = suiteBrandAccent
+                                    )
+                                }
+                            },
+                            primaryContent = bodyPane
+                        )
+                    } else {
+                        bodyPane()
+                    }
+                }
+
+                SuiteFooterStatusBar(
+                    suite = activeSuite,
+                    pageOrLineLabel = "Page ${(progress * maxOf(stats.lines / 42, 1)).toInt() + 1} of ${maxOf(stats.lines / 42, 1)}  •  Line ${((progress * stats.lines).toInt() + 1).coerceAtLeast(1)}",
+                    wordCount = stats.words,
+                    charCount = stats.characters,
+                    zoomPercent = (zoom * 100).roundToInt(),
+                    extraBadge = when (activeSuite) {
+                        ViewerSuiteStyle.GOOGLE_WORKSPACE -> if (suiteSession.pagelessMode) "Pageless" else "Print Layout"
+                        ViewerSuiteStyle.MICROSOFT_365 -> if (suiteSession.immersiveLineFocus) "Immersive Focus" else "Word Print View"
+                        ViewerSuiteStyle.WPS_SUPER -> suiteSession.paperTone.label
+                        ViewerSuiteStyle.LIBRE_OFFICE -> "ODF 1.3 Writer"
+                        ViewerSuiteStyle.OKEN_SCANNER -> suiteSession.scanFilter.label
+                    }
                 )
             }
 
@@ -1502,47 +1822,62 @@ fun RealDocumentCard(
     body: AnnotatedString,
     truncated: Boolean,
     modifier: Modifier = Modifier,
+    horizontalPadding: Dp = 20.dp,
     fontSize: TextUnit = 15.sp,
     lineHeight: TextUnit = 23.sp,
+    paperColor: Color? = null,
+    inkColor: Color? = null,
+    mutedInkColor: Color? = null,
+    brandAccent: Color? = null,
     onBodyLayout: ((TextLayoutResult) -> Unit)? = null,
     onBodyPositioned: ((Float) -> Unit)? = null
 ) {
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
-    val paper = palette.cardSurfaceStrong
-    val ink = palette.textPrimary
-    val inkMuted = palette.textSecondary
+    val paper = paperColor ?: palette.cardSurfaceStrong
+    val ink = inkColor ?: palette.textPrimary
+    val inkMuted = mutedInkColor ?: palette.textSecondary
+    val primaryBrand = brandAccent ?: accent.primary
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(VennelaTokens.radiusCard))
             .background(paper)
-            .border(1.dp, ink.copy(alpha = 0.10f), RoundedCornerShape(VennelaTokens.radiusCard))
-            .padding(horizontal = 20.dp, vertical = 18.dp)
+            .padding(horizontal = horizontalPadding, vertical = 22.dp)
     ) {
         Text(
             text = fileName,
             color = ink,
-            fontSize = 19.sp,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = (-0.2).sp,
-            maxLines = 2,
+            fontFamily = VennelaFonts.OnePlusDisplay,
+            fontSize = 22.sp,
+            lineHeight = 28.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = (-0.3).sp,
+            maxLines = 3,
             overflow = TextOverflow.Ellipsis
         )
         Text(
             text = subtitle,
-            color = inkMuted.copy(alpha = 0.85f),
-            fontSize = VennelaTokens.nano,
-            modifier = Modifier.padding(top = VennelaTokens.spaceXxs)
+            color = inkMuted.copy(alpha = 0.88f),
+            fontFamily = VennelaFonts.Sans,
+            fontSize = VennelaTokens.caption,
+            modifier = Modifier.padding(top = VennelaTokens.spaceXs)
         )
         Spacer(Modifier.height(VennelaTokens.spaceMd))
         Box(
             Modifier.fillMaxWidth()
-                .height(1.dp)
-                .background(ink.copy(alpha = 0.08f))
+                .height(1.8.dp)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            primaryBrand.copy(alpha = 0.85f),
+                            primaryBrand.copy(alpha = 0.35f),
+                            ink.copy(alpha = 0.08f)
+                        )
+                    )
+                )
         )
-        Spacer(Modifier.height(VennelaTokens.spaceMd))
+        Spacer(Modifier.height(VennelaTokens.spaceLg))
         Text(
             text = body,
             color = ink,
@@ -1559,7 +1894,7 @@ fun RealDocumentCard(
                 Icon(
                     Icons.Default.Info,
                     contentDescription = null,
-                    tint = accent.primary,
+                    tint = primaryBrand,
                     modifier = Modifier.size(VennelaTokens.iconSm)
                 )
                 Spacer(Modifier.width(VennelaTokens.spaceSm))

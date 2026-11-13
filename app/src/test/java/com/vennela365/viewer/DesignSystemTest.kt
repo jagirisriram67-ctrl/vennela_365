@@ -1,7 +1,15 @@
 package com.vennela365.viewer
 
 import androidx.compose.ui.unit.dp
+import com.vennela365.viewer.theme.AppFontStyle
 import com.vennela365.viewer.theme.VennelaTokens
+import com.vennela365.viewer.theme.vennelaTypographyFor
+import com.vennela365.viewer.ui.components.OkenScanFilter
+import com.vennela365.viewer.ui.components.ViewerKind
+import com.vennela365.viewer.ui.components.ViewerSuiteStyle
+import com.vennela365.viewer.ui.components.WpsPaperTone
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -108,5 +116,41 @@ class DesignSystemTest {
         // The painted control may be compact, but the accessible floor stays.
         assertTrue(VennelaTokens.touchTargetMin >= 44.dp)
         assertTrue(VennelaTokens.touchTargetCompact >= 36.dp)
+    }
+
+    @Test
+    fun `all 5 flagship viewing suites round-trip by id and provide distinct brand names`() {
+        assertEquals(5, ViewerSuiteStyle.entries.size)
+        ViewerSuiteStyle.entries.forEach { suite ->
+            assertEquals(suite, ViewerSuiteStyle.fromId(suite.id))
+            ViewerKind.entries.forEach { kind ->
+                assertTrue(kind.appNameFor(suite).isNotBlank())
+                assertTrue(kind.accentFor(suite).alpha > 0.9f)
+            }
+        }
+        assertEquals("Google Docs", ViewerKind.DOCS.appNameFor(ViewerSuiteStyle.GOOGLE_WORKSPACE))
+        assertEquals("Microsoft Word", ViewerKind.DOCS.appNameFor(ViewerSuiteStyle.MICROSOFT_365))
+        assertEquals("WPS Writer", ViewerKind.DOCS.appNameFor(ViewerSuiteStyle.WPS_SUPER))
+        assertEquals("LibreOffice Writer", ViewerKind.DOCS.appNameFor(ViewerSuiteStyle.LIBRE_OFFICE))
+        assertEquals("Oken HD Doc Scan", ViewerKind.DOCS.appNameFor(ViewerSuiteStyle.OKEN_SCANNER))
+    }
+
+    @Test
+    fun `oneplus sans is the default typography style and all font presets build valid typography`() {
+        assertEquals(AppFontStyle.ONEPLUS_SANS, AppFontStyle.fromId(null))
+        assertEquals(AppFontStyle.ONEPLUS_SANS, AppFontStyle.fromId("oneplus_sans"))
+        AppFontStyle.entries.forEach { style ->
+            val typo = vennelaTypographyFor(style)
+            assertNotNull(typo.bodyLarge.fontFamily)
+            assertNotNull(typo.headlineLarge.fontFamily)
+        }
+    }
+
+    @Test
+    fun `oken scanner filters and wps eye care paper tones provide valid color matrices`() {
+        assertEquals(5, OkenScanFilter.entries.size)
+        assertNotNull(OkenScanFilter.MAGIC_COLOR.toColorFilter())
+        assertNotNull(OkenScanFilter.BW_CRISP.toColorFilter())
+        assertEquals(0xFFC7EDCC.toInt(), WpsPaperTone.EYE_CARE_GREEN.paperColor.value.shr(32).toInt())
     }
 }

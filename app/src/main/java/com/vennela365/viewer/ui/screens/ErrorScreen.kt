@@ -26,14 +26,15 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Handyman
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.PriorityHigh
@@ -55,7 +56,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,6 +69,7 @@ import com.vennela365.viewer.rendering.ViewerState
 import com.vennela365.viewer.theme.LiquidMotion
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.ui.components.AnimatedDisclosure
 import com.vennela365.viewer.ui.components.FileBrandBadge
@@ -98,6 +103,7 @@ fun ErrorScreen(
     val selectedFile by viewModel.selectedFile.collectAsState()
     val viewerState by viewModel.viewerState.collectAsState()
     val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
 
@@ -126,6 +132,24 @@ fun ErrorScreen(
         }
     }
 
+    fun copyDiagnostics(failureState: ViewerState.Failed) {
+        val report = buildString {
+            appendLine("Vennela 365 File Diagnostics")
+            if (file != null) {
+                appendLine("File: ${file.name} (${file.formattedSize})")
+                appendLine("Extension: .${file.extension.uppercase()}")
+                appendLine("Category: ${file.formatInfo.category.displayName}")
+                appendLine("MIME: ${file.formatInfo.mimeType}")
+                appendLine("Support: L${file.formatInfo.levelNumber} • ${file.formatInfo.supportLevel.label}")
+                appendLine("Renderer: ${file.formatInfo.defaultRenderer}")
+            }
+            appendLine("Reason: ${failureState.reason}")
+            appendLine("Retryable: ${failureState.canRetry}")
+        }
+        clipboardManager.setText(AnnotatedString(report))
+        Toast.makeText(context, "Diagnostics copied to clipboard", Toast.LENGTH_SHORT).show()
+    }
+
     val subtitle = when {
         failure != null -> "${failure.reason.take(48)}${if (failure.reason.length > 48) "…" else ""}"
         loading -> "Re-checking ${file?.name ?: "the file"}…"
@@ -143,6 +167,7 @@ fun ErrorScreen(
                 Box(
                     modifier = Modifier
                         .size(VennelaTokens.touchTargetMin)
+                        .testTag("error_info_button")
                         .shadow(
                             elevation = 12.dp,
                             shape = RoundedCornerShape(VennelaTokens.radiusControl),
@@ -177,11 +202,9 @@ fun ErrorScreen(
             }
         }
     ) { pagePadding ->
-        LazyColumn(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                // A single soft neon wash anchors the top of the page so the
-                // error reads as a lit surface rather than a flat list.
                 .background(
                     Brush.verticalGradient(
                         0f to accent.primary.copy(alpha = 0.14f),
@@ -189,6 +212,12 @@ fun ErrorScreen(
                         1f to accent.secondary.copy(alpha = 0.08f)
                     )
                 ),
+            contentAlignment = Alignment.TopCenter
+        ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = 780.dp),
             contentPadding = PaddingValues(
                 start = VennelaTokens.gutter,
                 end = VennelaTokens.gutter,
@@ -265,6 +294,7 @@ fun ErrorScreen(
                                     Text(
                                         text = "Couldn't open this file",
                                         color = palette.textPrimary,
+                                        fontFamily = VennelaFonts.Sans,
                                         fontSize = VennelaTokens.titleLarge,
                                         fontWeight = FontWeight.Bold,
                                         textAlign = TextAlign.Center
@@ -273,6 +303,7 @@ fun ErrorScreen(
                                     Text(
                                         text = failure.reason,
                                         color = palette.textSecondary,
+                                        fontFamily = VennelaFonts.Sans,
                                         fontSize = VennelaTokens.bodySmall,
                                         textAlign = TextAlign.Center
                                     )
@@ -288,6 +319,7 @@ fun ErrorScreen(
                                                 Text(
                                                     text = file.name,
                                                     color = palette.textPrimary,
+                                                    fontFamily = VennelaFonts.Sans,
                                                     fontSize = VennelaTokens.titleSmall,
                                                     fontWeight = FontWeight.SemiBold,
                                                     maxLines = 1,
@@ -296,6 +328,7 @@ fun ErrorScreen(
                                                 Text(
                                                     text = "${file.extension.uppercase()} • ${file.formattedSize} • ${file.formattedDate}",
                                                     color = palette.textTertiary,
+                                                    fontFamily = VennelaFonts.Mono,
                                                     fontSize = VennelaTokens.micro
                                                 )
                                             }
@@ -317,7 +350,9 @@ fun ErrorScreen(
                                     text = "Try again",
                                     icon = Icons.Default.Refresh,
                                     isActive = true,
-                                    modifier = Modifier.heightIn(min = VennelaTokens.touchTargetMin),
+                                    modifier = Modifier
+                                        .heightIn(min = VennelaTokens.touchTargetMin)
+                                        .testTag("error_chip_retry"),
                                     onClick = { retry() }
                                 )
                             }
@@ -325,7 +360,9 @@ fun ErrorScreen(
                                 LiquidChip(
                                     text = "File details",
                                     icon = Icons.Default.Info,
-                                    modifier = Modifier.heightIn(min = VennelaTokens.touchTargetMin),
+                                    modifier = Modifier
+                                        .heightIn(min = VennelaTokens.touchTargetMin)
+                                        .testTag("error_chip_details"),
                                     onClick = { viewModel.navigateTo(Screen.FileMetadata) }
                                 )
                             }
@@ -333,7 +370,9 @@ fun ErrorScreen(
                                 LiquidChip(
                                     text = "Open with…",
                                     icon = Icons.AutoMirrored.Filled.OpenInNew,
-                                    modifier = Modifier.heightIn(min = VennelaTokens.touchTargetMin),
+                                    modifier = Modifier
+                                        .heightIn(min = VennelaTokens.touchTargetMin)
+                                        .testTag("error_chip_open_with"),
                                     onClick = { openWithAnotherApp() }
                                 )
                             }
@@ -341,7 +380,9 @@ fun ErrorScreen(
                                 LiquidChip(
                                     text = "Browse files",
                                     icon = Icons.Default.FolderOpen,
-                                    modifier = Modifier.heightIn(min = VennelaTokens.touchTargetMin),
+                                    modifier = Modifier
+                                        .heightIn(min = VennelaTokens.touchTargetMin)
+                                        .testTag("error_chip_browse"),
                                     onClick = { viewModel.navigateTo(Screen.FileExplorer) }
                                 )
                             }
@@ -412,25 +453,22 @@ fun ErrorScreen(
                             LiquidButton(
                                 label = if (failure.canRetry) "Try again" else "Back to library",
                                 icon = Icons.Default.Refresh,
+                                modifier = Modifier.testTag("error_retry_button"),
                                 onClick = { retry() }
                             )
                             Spacer(modifier = Modifier.height(VennelaTokens.spaceSm))
                             SecondaryAction(
                                 icon = Icons.AutoMirrored.Filled.OpenInNew,
                                 label = "Open with another app",
+                                modifier = Modifier.testTag("error_open_with_button"),
                                 onClick = { openWithAnotherApp() }
                             )
                             Spacer(modifier = Modifier.height(VennelaTokens.spaceXs))
                             SecondaryAction(
-                                icon = Icons.Default.Handyman,
-                                label = "Report this format",
-                                onClick = {
-                                    Toast.makeText(
-                                        context,
-                                        "${file?.extension?.uppercase() ?: "This format"} reported — thank you",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
+                                icon = Icons.Default.ContentCopy,
+                                label = "Copy error diagnostics",
+                                modifier = Modifier.testTag("error_copy_diagnostics_button"),
+                                onClick = { copyDiagnostics(failure) }
                             )
                         }
                     }
@@ -537,12 +575,14 @@ fun ErrorScreen(
                             LiquidButton(
                                 label = "Open ${file.name}",
                                 icon = Icons.Default.FolderOpen,
+                                modifier = Modifier.testTag("error_recovered_open_button"),
                                 onClick = { viewModel.openFile(file) }
                             )
                             Spacer(modifier = Modifier.height(VennelaTokens.spaceSm))
                             SecondaryAction(
                                 icon = Icons.Default.Info,
                                 label = "View full details",
+                                modifier = Modifier.testTag("error_recovered_details_button"),
                                 onClick = { viewModel.navigateTo(Screen.FileMetadata) }
                             )
                         }
@@ -586,10 +626,12 @@ fun ErrorScreen(
                     Text(
                         text = "Your original file remains unchanged.",
                         color = palette.textTertiary,
+                        fontFamily = VennelaFonts.Sans,
                         fontSize = VennelaTokens.micro
                     )
                 }
             }
+        }
         }
     }
 }
@@ -750,6 +792,7 @@ private fun DiagnosticsDisclosure(
     GlassPanel(
         modifier = Modifier
             .fillMaxWidth()
+            .testTag("error_diagnostics_toggle")
             .shadow(
                 elevation = panelGlow.dp,
                 shape = RoundedCornerShape(VennelaTokens.radiusCard),
@@ -842,6 +885,7 @@ private fun DiagnosticsRow(label: String, value: String) {
         Text(
             text = value,
             color = palette.textSecondary,
+            fontFamily = VennelaFonts.Mono,
             fontSize = VennelaTokens.caption,
             modifier = Modifier.weight(1f)
         )
@@ -856,6 +900,7 @@ private fun DiagnosticsRow(label: String, value: String) {
 private fun SecondaryAction(
     icon: ImageVector,
     label: String,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     val palette = LocalVennelaPalette.current
@@ -868,8 +913,9 @@ private fun SecondaryAction(
     )
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
+            .heightIn(min = VennelaTokens.touchTargetMin)
             .shadow(
                 elevation = 8.dp,
                 shape = shape,
@@ -888,7 +934,7 @@ private fun SecondaryAction(
             )
             .border(1.dp, border, shape)
             .pressScale(pressedScale = 0.97f, onClick = onClick)
-            .padding(horizontal = VennelaTokens.spaceXl, vertical = VennelaTokens.spaceLg),
+            .padding(horizontal = VennelaTokens.spaceXl, vertical = VennelaTokens.spaceMd),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -902,6 +948,7 @@ private fun SecondaryAction(
         Text(
             text = label,
             color = palette.textPrimary,
+            fontFamily = VennelaFonts.Sans,
             fontSize = VennelaTokens.bodySmall,
             fontWeight = FontWeight.Medium,
             maxLines = 1,

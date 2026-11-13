@@ -1,14 +1,12 @@
 package com.vennela365.viewer.ui.screens
 
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,34 +19,27 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.FolderZip
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.NightlightRound
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SdCard
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Usb
-import androidx.compose.material.icons.filled.ViewInAr
+import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -63,6 +54,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -71,26 +65,26 @@ import coil.compose.AsyncImage
 import com.vennela365.viewer.model.FileItem
 import com.vennela365.viewer.registry.FormatCategory
 import com.vennela365.viewer.registry.FormatRegistry
-import com.vennela365.viewer.storage.StorageVolumeInfo
-import com.vennela365.viewer.storage.VolumeKind
+import com.vennela365.viewer.theme.CatRose
+import com.vennela365.viewer.theme.LiquidGlassSpec
 import com.vennela365.viewer.theme.LiquidMotion
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.theme.liquidGlass
 import com.vennela365.viewer.theme.liquidGlassSpec
 import com.vennela365.viewer.ui.components.FileBrandBadge
 import com.vennela365.viewer.ui.components.FloatingDockNav
-import com.vennela365.viewer.ui.components.GlassCard
 import com.vennela365.viewer.ui.components.GlassDivider
 import com.vennela365.viewer.ui.components.GlassPanel
-import com.vennela365.viewer.ui.components.IconBadge
 import com.vennela365.viewer.ui.components.LiquidButton
-import com.vennela365.viewer.ui.components.LiquidChip
 import com.vennela365.viewer.ui.components.LiquidPage
 import com.vennela365.viewer.ui.components.SectionHeader
-import com.vennela365.viewer.ui.components.VennelaEmptyState
+import com.vennela365.viewer.ui.components.SuiteStyleSwitcherStrip
+import com.vennela365.viewer.ui.components.ViewerSuiteStyle
 import com.vennela365.viewer.ui.components.pressScale
+import com.vennela365.viewer.ui.components.rememberLazyScrollSignal
 import com.vennela365.viewer.ui.components.staggeredEntrance
 import com.vennela365.viewer.viewmodel.MainViewModel
 import com.vennela365.viewer.viewmodel.Screen
@@ -113,27 +107,43 @@ data class CategoryCardItem(
 fun categoryItems(): List<CategoryCardItem> {
     fun count(category: FormatCategory) = FormatRegistry.getByCategory(category).size
     return listOf(
-        CategoryCardItem("Documents", "${count(FormatCategory.DOCUMENTS)} formats", Icons.Default.Description, Color(0xFF00B0FF), Color(0xFF0077D4), FormatCategory.DOCUMENTS),
-        CategoryCardItem("Code & Dev", "${count(FormatCategory.CODE)} formats", Icons.Default.Code, Color(0xFF8B5CF6), Color(0xFF5B21B6), FormatCategory.CODE),
-        CategoryCardItem("Spreadsheets", "${count(FormatCategory.SPREADSHEETS)} formats", Icons.Default.Description, Color(0xFF00E676), Color(0xFF00964A), FormatCategory.SPREADSHEETS),
-        CategoryCardItem("Images & Art", "${count(FormatCategory.IMAGES)} formats", Icons.Default.Image, Color(0xFF00E5FF), Color(0xFF0098A6), FormatCategory.IMAGES),
-        CategoryCardItem("Audio & Sound", "${count(FormatCategory.AUDIO)} formats", Icons.Default.MusicNote, Color(0xFFFF4081), Color(0xFFC2185B), FormatCategory.AUDIO),
-        CategoryCardItem("Cinema & Video", "${count(FormatCategory.VIDEO)} formats", Icons.Default.PlayArrow, Color(0xFFB388FF), Color(0xFF7C4DFF), FormatCategory.VIDEO),
-        CategoryCardItem("Archives & Zip", "${count(FormatCategory.ARCHIVES)} formats", Icons.Default.FolderZip, Color(0xFFFFAB00), Color(0xFFD67E00), FormatCategory.ARCHIVES),
-        CategoryCardItem("3D & Spatial", "${count(FormatCategory.CAD_3D)} formats", Icons.Default.ViewInAr, Color(0xFFFF6D00), Color(0xFFE65100), FormatCategory.CAD_3D)
+        CategoryCardItem("Documents", "${count(FormatCategory.DOCUMENTS)} formats", Icons.Default.Description, Color(0xFF2F8BFF), Color(0xFF0A66D6), FormatCategory.DOCUMENTS),
+        CategoryCardItem("Images", "${count(FormatCategory.IMAGES)} formats", Icons.Default.Image, Color(0xFF14C9A4), Color(0xFF0A9378), FormatCategory.IMAGES),
+        CategoryCardItem("Videos", "${count(FormatCategory.VIDEO)} formats", Icons.Default.PlayArrow, Color(0xFF9E6BFF), Color(0xFF6E35E8), FormatCategory.VIDEO),
+        CategoryCardItem("Audio", "${count(FormatCategory.AUDIO)} formats", Icons.Default.MusicNote, Color(0xFF28A9FF), Color(0xFF137CE2), FormatCategory.AUDIO),
+        CategoryCardItem("Archives", "${count(FormatCategory.ARCHIVES)} formats", Icons.Default.FolderZip, Color(0xFFF5A623), Color(0xFFD47B00), FormatCategory.ARCHIVES),
+        CategoryCardItem("Code", "${count(FormatCategory.CODE)} formats", Icons.Default.Code, Color(0xFF6B7CFF), Color(0xFF4750DB), FormatCategory.CODE),
+        CategoryCardItem("Ebooks", "${count(FormatCategory.EBOOKS)} formats", Icons.AutoMirrored.Filled.MenuBook, Color(0xFF00BCD4), Color(0xFF008B9E), FormatCategory.EBOOKS),
+        CategoryCardItem("Spreadsheets", "${count(FormatCategory.SPREADSHEETS)} formats", Icons.Default.TableChart, Color(0xFF1ED760), Color(0xFF0F9D43), FormatCategory.SPREADSHEETS)
     )
 }
 
 @Composable
 fun HomeScreen(viewModel: MainViewModel) {
     val recentFiles by viewModel.recentFiles.collectAsState()
-    val volumes by viewModel.volumes.collectAsState()
-    val allFilesGranted by viewModel.allFilesGranted.collectAsState()
+    val activeSuite by viewModel.preferredSuiteStyle.collectAsState()
     val palette = LocalVennelaPalette.current
-    val accent = LocalVennelaAccent.current
+    val context = LocalContext.current
     val categories = remember { categoryItems() }
+    val listState = rememberLazyListState()
+
+    val openDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            var displayName: String? = null
+            runCatching {
+                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (idx != -1 && cursor.moveToFirst()) displayName = cursor.getString(idx)
+                }
+            }
+            viewModel.openUri(uri, displayName ?: uri.lastPathSegment)
+        }
+    }
 
     LiquidPage(
+        scrollState = rememberLazyScrollSignal(listState),
         dock = {
             FloatingDockNav(
                 activeTab = "home",
@@ -149,6 +159,7 @@ fun HomeScreen(viewModel: MainViewModel) {
         }
     ) { pagePadding ->
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(
                 start = VennelaTokens.gutter,
@@ -158,557 +169,364 @@ fun HomeScreen(viewModel: MainViewModel) {
             ),
             verticalArrangement = Arrangement.spacedBy(VennelaTokens.spaceMd)
         ) {
-            // 1. Futuristic Floating Command Island Header
-            item(key = "command_island") {
-                HomeCommandIsland(viewModel)
-            }
-
-            // 2. Liquid Search Hologram Capsule
-            item(key = "search_capsule") {
-                HomeSearchCapsule(onClick = { viewModel.navigateTo(Screen.UniversalSearch) })
-            }
-
-            // 3. Quick Reflex Power Hub Chips
-            item(key = "power_hub") {
-                QuickActions(
-                    onLens = { viewModel.navigateTo(Screen.UniversalLensViewer) },
-                    onBrowse = { viewModel.navigateTo(Screen.AllFiles) },
-                    onThemes = { viewModel.navigateTo(Screen.ThemeSelection) },
-                    onFidelity = { viewModel.navigateTo(Screen.ThemeSelection) }
+            item(key = "home_header") {
+                HomeHeader(
+                    onSearchClick = { viewModel.navigateTo(Screen.UniversalSearch) },
+                    onSettingsClick = { viewModel.navigateTo(Screen.Settings) }
                 )
             }
 
-            // 4. Hero Format Matrix Bento Hub
-            item(key = "format_matrix") {
-                FormatMatrixBentoCard(
-                    categories = categories,
-                    onCategoryClick = { cat ->
-                        viewModel.setCategory(cat)
-                        viewModel.navigateTo(Screen.Categories)
-                    },
-                    onOpenAllFormats = {
-                        viewModel.setCategory(null)
-                        viewModel.navigateTo(Screen.Categories)
+            item(key = "home_search") {
+                HomeSearchBar(
+                    onSearchClick = { viewModel.navigateTo(Screen.UniversalSearch) },
+                    onOpenPickerClick = { openDocumentLauncher.launch(arrayOf("*/*")) }
+                )
+            }
+
+            item(key = "home_suite_strip") {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "FILE VIEWING ENGINE • ${activeSuite.badge.uppercase()}",
+                            color = palette.textSecondary,
+                            fontFamily = VennelaFonts.OnePlusDisplay,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.7.sp
+                        )
+                        Text(
+                            text = activeSuite.subtitle,
+                            color = activeSuite.brandPrimary,
+                            fontFamily = VennelaFonts.Sans,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
-                )
+                    SuiteStyleSwitcherStrip(
+                        activeSuite = activeSuite,
+                        onSelectSuite = { viewModel.setPreferredSuiteStyle(it) },
+                        isDark = palette.isDark
+                    )
+                }
             }
 
-            // 5. Horizontal 3D Kinetic Carousel of Recent Files
-            item(key = "recent_carousel_header") {
+            item(key = "home_categories") {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    categories.chunked(2).forEachIndexed { rowIndex, row ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            row.forEachIndexed { colIndex, item ->
+                                val index = rowIndex * 2 + colIndex
+                                CategoryCard(
+                                    item = item,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .staggeredEntrance(index)
+                                        .testTag("home_category_${item.category.name.lowercase()}"),
+                                    onClick = {
+                                        viewModel.setCategory(item.category)
+                                        viewModel.navigateTo(Screen.Categories)
+                                    }
+                                )
+                            }
+                            if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+
+            item(key = "recent_header") {
                 SectionHeader(
-                    title = "Recent Documents",
-                    actionLabel = "View Library",
+                    title = "Recent Files",
+                    actionLabel = "See all",
                     onAction = { viewModel.navigateTo(Screen.RecentFiles) }
                 )
             }
 
-            item(key = "recent_carousel") {
-                RecentFilesKineticCarousel(
-                    recentFiles = recentFiles,
+            item(key = "recent_card") {
+                RecentFilesGlassCard(
+                    recentFiles = recentFiles.take(5),
                     onFileClick = { viewModel.openFile(it) },
+                    onMoreClick = {
+                        viewModel.selectFile(it)
+                        viewModel.navigateTo(Screen.FileMetadata)
+                    },
+                    onOpenFileClick = { openDocumentLauncher.launch(arrayOf("*/*")) },
                     onBrowseClick = { viewModel.navigateTo(Screen.AllFiles) }
                 )
             }
-
-            // 6. Device Hardware Storage Console
-            item(key = "storage_header") {
-                SectionHeader(
-                    title = "Storage Hardware",
-                    actionLabel = "File Explorer",
-                    onAction = { viewModel.navigateTo(Screen.AllFiles) }
-                )
-            }
-
-            item(key = "storage_console") {
-                HomeStorageConsole(
-                    volumes = volumes,
-                    granted = allFilesGranted,
-                    onOpenAll = { viewModel.navigateTo(Screen.AllFiles) },
-                    onOpenVolume = { path ->
-                        viewModel.openDevicePath(path)
-                        viewModel.navigateTo(Screen.AllFiles)
-                    }
-                )
-            }
-
-            // 7. System Engine Status Footer
-            item(key = "engine_status_footer") {
-                EngineStatusFooter(
-                    palette = palette,
-                    accent = accent,
-                    onOpen = { viewModel.navigateTo(Screen.AllFiles) }
-                )
-            }
-        }
-    }
-}
-
-/* ------------------------------------------------------------------------- */
-/* 1. Floating Command Island Header                                         */
-/* ------------------------------------------------------------------------- */
-
-@Composable
-private fun HomeCommandIsland(viewModel: MainViewModel) {
-    val palette = LocalVennelaPalette.current
-    val accent = LocalVennelaAccent.current
-    val shape = RoundedCornerShape(26.dp)
-
-    val entrance = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        entrance.animateTo(1f, LiquidMotion.glide(LiquidMotion.durationSlow))
-    }
-
-    // Continuous breathing quantum node
-    val infiniteTransition = rememberInfiniteTransition(label = "quantumGlow")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 1.25f,
-        animationSpec = infiniteRepeatable(
-            animation = LiquidMotion.shimmer(1400),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "quantumScale"
-    )
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.50f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = LiquidMotion.shimmer(1400),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "quantumAlpha"
-    )
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = VennelaTokens.spaceXs)
-            .graphicsLayer {
-                val t = entrance.value
-                translationY = (1f - t) * 18f
-                scaleX = 0.95f + 0.05f * t
-                scaleY = 0.95f + 0.05f * t
-                alpha = t
-            }
-            .shadow(
-                elevation = 20.dp,
-                shape = shape,
-                clip = false,
-                ambientColor = accent.primary.copy(alpha = 0.40f),
-                spotColor = accent.secondary.copy(alpha = 0.35f)
-            )
-            .clip(shape)
-            .background(
-                Brush.linearGradient(
-                    listOf(
-                        palette.cardSurfaceStrong.copy(alpha = 0.92f),
-                        palette.cardSurface.copy(alpha = 0.78f),
-                        palette.backgroundTop.copy(alpha = 0.85f)
-                    )
-                )
-            )
-            .border(
-                1.dp,
-                Brush.linearGradient(
-                    listOf(
-                        Color.White.copy(alpha = 0.38f),
-                        accent.secondary.copy(alpha = 0.35f),
-                        Color.Transparent
-                    )
-                ),
-                shape
-            )
-            .padding(horizontal = 18.dp, vertical = 14.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Futuristic Quantum Brand Monogram
-            Box(
-                modifier = Modifier
-                    .size(46.dp)
-                    .shadow(
-                        elevation = 12.dp,
-                        shape = RoundedCornerShape(16.dp),
-                        clip = false,
-                        ambientColor = accent.primary.copy(alpha = 0.60f),
-                        spotColor = accent.secondary.copy(alpha = 0.60f)
-                    )
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(
-                        Brush.linearGradient(
-                            listOf(
-                                accent.primary.copy(alpha = 0.40f),
-                                accent.secondary.copy(alpha = 0.15f)
-                            )
-                        )
-                    )
-                    .border(
-                        1.dp,
-                        Brush.linearGradient(
-                            listOf(
-                                accent.secondary.copy(alpha = 0.80f),
-                                Color.White.copy(alpha = 0.40f)
-                            )
-                        ),
-                        RoundedCornerShape(16.dp)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Layers,
-                    contentDescription = "Vennela Core",
-                    tint = accent.secondary,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(14.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "VENNELA",
-                        color = palette.textPrimary,
-                        fontSize = 19.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 1.5.sp
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .graphicsLayer {
-                                scaleX = pulseScale
-                                scaleY = pulseScale
-                                alpha = pulseAlpha
-                            }
-                            .clip(CircleShape)
-                            .background(accent.secondary)
-                    )
-                }
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "${FormatRegistry.totalCount} FORMATS • ZERO-LATENCY NATIVE",
-                    color = accent.secondary.copy(alpha = 0.90f),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.8.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            // Quick Floating Island Action Buttons
-            HeaderReflexButton(
-                icon = Icons.Default.Search,
-                description = "Universal Search",
-                onClick = { viewModel.navigateTo(Screen.UniversalSearch) }
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            HeaderReflexButton(
-                icon = Icons.Default.Settings,
-                description = "System Settings",
-                onClick = { viewModel.navigateTo(Screen.Settings) }
-            )
         }
     }
 }
 
 @Composable
-private fun HeaderReflexButton(
-    icon: ImageVector,
-    description: String,
-    onClick: () -> Unit
+private fun HomeHeader(
+    onSearchClick: () -> Unit,
+    onSettingsClick: () -> Unit
 ) {
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
-    Box(
+    val entrance = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { entrance.animateTo(1f, LiquidMotion.glide(LiquidMotion.durationBase)) }
+
+    val barShape = RoundedCornerShape(VennelaTokens.radiusPill)
+    val barSpec = liquidGlassSpec(
+        alpha = if (palette.isDark) 0.72f else 0.86f,
+        frost = VennelaTokens.frostHeavy,
+        elevation = VennelaTokens.elevationBar,
+        sheen = 0.24f,
+        highlight = 0.20f
+    )
+
+    Row(
         modifier = Modifier
-            .size(38.dp)
-            .shadow(
-                elevation = 8.dp,
-                shape = CircleShape,
-                clip = false,
-                ambientColor = accent.primary.copy(alpha = 0.35f),
-                spotColor = accent.secondary.copy(alpha = 0.35f)
-            )
-            .clip(CircleShape)
-            .background(
-                Brush.linearGradient(
-                    listOf(
-                        palette.cardSurface.copy(alpha = 0.80f),
-                        accent.primary.copy(alpha = 0.22f)
+            .fillMaxWidth()
+            .height(54.dp)
+            .graphicsLayer {
+                alpha = entrance.value
+                translationY = (1f - entrance.value) * 10f
+            }
+            .liquidGlass(barSpec, barShape)
+            .padding(start = 9.dp, end = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .shadow(
+                    elevation = 8.dp,
+                    shape = RoundedCornerShape(12.dp),
+                    clip = false,
+                    ambientColor = accent.primary.copy(alpha = 0.42f),
+                    spotColor = accent.secondary.copy(alpha = 0.42f)
+                )
+                .clip(RoundedCornerShape(12.dp))
+                .background(
+                    Brush.linearGradient(
+                        listOf(
+                            accent.primary,
+                            accent.secondary.copy(alpha = 0.88f)
+                        )
                     )
                 )
+                .border(
+                    1.dp,
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.White.copy(alpha = 0.58f),
+                            Color.White.copy(alpha = 0.14f)
+                        )
+                    ),
+                    RoundedCornerShape(12.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.NightlightRound,
+                contentDescription = "Vennela 365",
+                tint = Color(0xFFFDE68A),
+                modifier = Modifier.size(20.dp)
             )
-            .border(1.dp, Color.White.copy(alpha = 0.25f), CircleShape)
-            .pressScale(pressedScale = 0.88f, onClick = onClick),
+        }
+
+        Spacer(modifier = Modifier.width(11.dp))
+
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "Vennela 365",
+                color = palette.textPrimary,
+                fontFamily = VennelaFonts.Sans,
+                fontSize = 17.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.3).sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = "Universal File Studio",
+                color = palette.textSecondary,
+                fontFamily = VennelaFonts.Sans,
+                fontSize = 11.sp,
+                lineHeight = 13.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            HomeHeaderIconButton(
+                icon = Icons.Default.Search,
+                contentDescription = "Search files",
+                modifier = Modifier.testTag("home_search_btn"),
+                onClick = onSearchClick
+            )
+            HomeHeaderIconButton(
+                icon = Icons.Default.Settings,
+                contentDescription = "Settings",
+                modifier = Modifier.testTag("home_settings_btn"),
+                onClick = onSettingsClick
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeHeaderIconButton(
+    icon: ImageVector,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val palette = LocalVennelaPalette.current
+    val fillBrush = if (palette.isDark) {
+        Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.15f),
+                Color.White.copy(alpha = 0.06f)
+            )
+        )
+    } else {
+        Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.92f),
+                palette.cardSurface.copy(alpha = 0.74f)
+            )
+        )
+    }
+    val rimBrush = Brush.verticalGradient(
+        listOf(
+            Color.White.copy(alpha = if (palette.isDark) 0.30f else 0.88f),
+            Color.White.copy(alpha = 0.10f)
+        )
+    )
+    Box(
+        modifier = modifier
+            .size(VennelaTokens.controlSm)
+            .clip(CircleShape)
+            .background(fillBrush, CircleShape)
+            .border(1.dp, rimBrush, CircleShape)
+            .pressScale(pressedScale = 0.90f, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = description,
+            contentDescription = contentDescription,
             tint = palette.textPrimary,
             modifier = Modifier.size(18.dp)
         )
     }
 }
 
-/* ------------------------------------------------------------------------- */
-/* 2. Liquid Search Hologram Capsule                                         */
-/* ------------------------------------------------------------------------- */
-
 @Composable
-private fun HomeSearchCapsule(onClick: () -> Unit) {
+private fun HomeSearchBar(
+    onSearchClick: () -> Unit,
+    onOpenPickerClick: () -> Unit
+) {
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
-    val shape = RoundedCornerShape(22.dp)
+    val spec = liquidGlassSpec(
+        alpha = if (palette.isDark) 0.60f else 0.84f,
+        frost = VennelaTokens.frostRegular,
+        elevation = VennelaTokens.elevationCard,
+        sheen = 0.22f,
+        highlight = 0.18f
+    )
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(
-                elevation = 16.dp,
-                shape = shape,
-                clip = false,
-                ambientColor = accent.primary.copy(alpha = 0.35f),
-                spotColor = accent.secondary.copy(alpha = 0.35f)
-            )
-            .clip(shape)
-            .background(
-                Brush.horizontalGradient(
-                    listOf(
-                        palette.cardSurfaceStrong.copy(alpha = 0.88f),
-                        palette.cardSurface.copy(alpha = 0.72f),
-                        palette.cardSurfaceStrong.copy(alpha = 0.88f)
-                    )
-                )
-            )
-            .border(
-                1.dp,
-                Brush.horizontalGradient(
-                    listOf(
-                        accent.secondary.copy(alpha = 0.50f),
-                        Color.White.copy(alpha = 0.20f),
-                        accent.primary.copy(alpha = 0.40f)
-                    )
-                ),
-                shape
-            )
-            .pressScale(pressedScale = 0.98f, onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 13.dp),
+            .height(50.dp)
+            .liquidGlass(spec, RoundedCornerShape(VennelaTokens.radiusPill))
+            .testTag("home_search_bar")
+            .pressScale(pressedScale = 0.985f, onClick = onSearchClick)
+            .padding(start = 16.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(accent.secondary.copy(alpha = 0.18f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Search,
-                contentDescription = null,
-                tint = accent.secondary,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-        Spacer(modifier = Modifier.width(12.dp))
+        Icon(
+            imageVector = Icons.Default.Search,
+            contentDescription = null,
+            tint = accent.secondary,
+            modifier = Modifier.size(19.dp)
+        )
+        Spacer(modifier = Modifier.width(10.dp))
         Text(
-            text = "Search 140+ formats, documents, archives…",
+            text = "Search files, folders, formats…",
             color = palette.textSecondary,
+            fontFamily = VennelaFonts.Sans,
             fontSize = 14.sp,
-            fontWeight = FontWeight.Normal,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
-        Icon(
-            imageVector = Icons.Default.Tune,
-            contentDescription = "Search Filter",
-            tint = palette.textTertiary,
-            modifier = Modifier.size(18.dp)
-        )
-    }
-}
-
-/* ------------------------------------------------------------------------- */
-/* 3. Quick Reflex Power Hub Chips                                           */
-/* ------------------------------------------------------------------------- */
-
-@Composable
-private fun QuickActions(
-    onLens: () -> Unit,
-    onBrowse: () -> Unit,
-    onThemes: () -> Unit,
-    onFidelity: () -> Unit
-) {
-    LazyRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        contentPadding = PaddingValues(horizontal = 2.dp)
-    ) {
-        item {
-            LiquidChip(
-                text = "Universal Lens",
-                icon = Icons.Default.AutoAwesome,
-                isActive = true,
-                modifier = Modifier.staggeredEntrance(0),
-                onClick = onLens
-            )
-        }
-        item {
-            LiquidChip(
-                text = "Storage Root",
-                icon = Icons.Default.FolderOpen,
-                modifier = Modifier.staggeredEntrance(1),
-                onClick = onBrowse
-            )
-        }
-        item {
-            LiquidChip(
-                text = "Theme Lab",
-                icon = Icons.Default.Palette,
-                modifier = Modifier.staggeredEntrance(2),
-                onClick = onThemes
-            )
-        }
-        item {
-            LiquidChip(
-                text = "120 FPS Engine",
-                icon = Icons.Default.Speed,
-                modifier = Modifier.staggeredEntrance(3),
-                onClick = onFidelity
-            )
-        }
-    }
-}
-
-/* ------------------------------------------------------------------------- */
-/* 4. Format Matrix Bento Hub                                                */
-/* ------------------------------------------------------------------------- */
-
-@Composable
-private fun FormatMatrixBentoCard(
-    categories: List<CategoryCardItem>,
-    onCategoryClick: (FormatCategory) -> Unit,
-    onOpenAllFormats: () -> Unit
-) {
-    val palette = LocalVennelaPalette.current
-    val accent = LocalVennelaAccent.current
-    val shape = RoundedCornerShape(28.dp)
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(
-                elevation = 18.dp,
-                shape = shape,
-                clip = false,
-                ambientColor = accent.secondary.copy(alpha = 0.30f),
-                spotColor = accent.primary.copy(alpha = 0.30f)
-            )
-            .clip(shape)
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        palette.cardSurfaceStrong.copy(alpha = 0.90f),
-                        palette.cardSurface.copy(alpha = 0.75f)
-                    )
+        val openFill = if (palette.isDark) {
+            Brush.verticalGradient(
+                listOf(
+                    Color.White.copy(alpha = 0.20f),
+                    accent.primary.copy(alpha = 0.36f),
+                    accent.secondary.copy(alpha = 0.24f)
                 )
             )
-            .border(
-                1.dp,
-                Brush.verticalGradient(
-                    listOf(
-                        Color.White.copy(alpha = 0.32f),
-                        accent.secondary.copy(alpha = 0.25f),
-                        Color.Transparent
-                    )
-                ),
-                shape
+        } else {
+            Brush.verticalGradient(
+                listOf(
+                    Color.White.copy(alpha = 0.96f),
+                    accent.primary.copy(alpha = 0.18f)
+                )
             )
-            .padding(18.dp)
-    ) {
-        Column {
-            // Header row of Bento Box
+        }
+        val openRim = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = if (palette.isDark) 0.56f else 0.92f),
+                accent.secondary.copy(alpha = 0.42f)
+            )
+        )
+        Box(
+            modifier = Modifier
+                .height(36.dp)
+                .clip(RoundedCornerShape(VennelaTokens.radiusPill))
+                .background(openFill)
+                .border(1.dp, openRim, RoundedCornerShape(VennelaTokens.radiusPill))
+                .testTag("home_quick_open_btn")
+                .pressScale(pressedScale = 0.94f, onClick = onOpenPickerClick)
+                .padding(horizontal = 13.dp),
+            contentAlignment = Alignment.Center
+        ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(accent.primary.copy(alpha = 0.25f))
-                            .border(1.dp, accent.secondary.copy(alpha = 0.60f), RoundedCornerShape(10.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Layers,
-                            contentDescription = null,
-                            tint = accent.secondary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = "FORMAT MATRIX",
-                            color = palette.textPrimary,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 1.sp
-                        )
-                        Text(
-                            text = "Zero-JVM-Heap Streaming Pipeline",
-                            color = palette.textSecondary,
-                            fontSize = 11.sp
-                        )
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(accent.secondary.copy(alpha = 0.16f))
-                        .border(1.dp, accent.secondary.copy(alpha = 0.50f), RoundedCornerShape(50))
-                        .pressScale(pressedScale = 0.92f, onClick = onOpenAllFormats)
-                        .padding(horizontal = 12.dp, vertical = 5.dp)
-                ) {
-                    Text(
-                        text = "142 Active",
-                        color = accent.secondary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 2-Column High-Tech Grid of Categories
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                categories.chunked(2).forEachIndexed { rowIndex, row ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        row.forEachIndexed { colIndex, item ->
-                            val index = rowIndex * 2 + colIndex
-                            CategoryReflexTile(
-                                item = item,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .staggeredEntrance(index),
-                                onClick = { onCategoryClick(item.category) }
-                            )
-                        }
-                        if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
-                    }
-                }
+                Icon(
+                    imageVector = Icons.Default.FolderOpen,
+                    contentDescription = "Open file from device",
+                    tint = if (palette.isDark) Color.White else accent.primary,
+                    modifier = Modifier.size(15.dp)
+                )
+                Text(
+                    text = "Open",
+                    color = if (palette.isDark) Color.White else accent.primary,
+                    fontFamily = VennelaFonts.Sans,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
@@ -719,65 +537,67 @@ fun CategoryCard(
     item: CategoryCardItem,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
-) = CategoryReflexTile(item = item, modifier = modifier, onClick = onClick)
-
-@Composable
-private fun CategoryReflexTile(
-    item: CategoryCardItem,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
 ) {
     val palette = LocalVennelaPalette.current
-    val shape = RoundedCornerShape(18.dp)
+    val shape = RoundedCornerShape(VennelaTokens.radiusTile)
+    val spec = LiquidGlassSpec(
+        tint = if (palette.isDark) {
+            Color(0xFF171F35).copy(alpha = 0.68f)
+        } else {
+            Color.White.copy(alpha = 0.86f)
+        },
+        tintEnd = item.color.copy(alpha = if (palette.isDark) 0.16f else 0.12f),
+        frost = VennelaTokens.frostRegular,
+        backdropAlpha = 0.72f,
+        rim = if (palette.isDark) {
+            item.color.copy(alpha = 0.36f)
+        } else {
+            Color.White.copy(alpha = 0.90f)
+        },
+        rimWidth = 1.dp,
+        sheen = 0.22f,
+        elevation = 8.dp,
+        shadowColor = if (palette.isDark) {
+            Color.Black.copy(alpha = 0.42f)
+        } else {
+            item.color.copy(alpha = 0.14f)
+        },
+        highlight = 0.18f
+    )
 
     Row(
         modifier = modifier
-            .shadow(
-                elevation = 8.dp,
-                shape = shape,
-                clip = false,
-                ambientColor = item.color.copy(alpha = 0.35f),
-                spotColor = item.gradientEnd.copy(alpha = 0.35f)
-            )
-            .clip(shape)
-            .background(
-                Brush.linearGradient(
-                    listOf(
-                        item.color.copy(alpha = 0.16f),
-                        palette.cardSurface.copy(alpha = 0.65f)
-                    )
-                )
-            )
-            .border(
-                1.dp,
-                Brush.linearGradient(
-                    listOf(
-                        item.color.copy(alpha = 0.55f),
-                        Color.White.copy(alpha = 0.15f)
-                    )
-                ),
-                shape
-            )
-            .pressScale(pressedScale = 0.94f, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .liquidGlass(spec, shape)
+            .pressScale(pressedScale = 0.96f, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(36.dp)
-                .clip(RoundedCornerShape(11.dp))
-                .background(
-                    Brush.linearGradient(
-                        listOf(item.color, item.gradientEnd)
-                    )
+                .size(40.dp)
+                .shadow(
+                    elevation = 6.dp,
+                    shape = RoundedCornerShape(12.dp),
+                    clip = false,
+                    ambientColor = item.color.copy(alpha = 0.40f),
+                    spotColor = item.gradientEnd.copy(alpha = 0.40f)
+                )
+                .clip(RoundedCornerShape(12.dp))
+                .background(Brush.linearGradient(listOf(item.color, item.gradientEnd)))
+                .border(
+                    1.dp,
+                    Brush.verticalGradient(
+                        listOf(Color.White.copy(alpha = 0.56f), Color.White.copy(alpha = 0.10f))
+                    ),
+                    RoundedCornerShape(12.dp)
                 ),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = item.icon,
-                contentDescription = null,
+                contentDescription = item.title,
                 tint = Color.White,
-                modifier = Modifier.size(19.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
 
@@ -787,449 +607,248 @@ private fun CategoryReflexTile(
             Text(
                 text = item.title,
                 color = palette.textPrimary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
+                fontFamily = VennelaFonts.Sans,
+                fontSize = 14.sp,
+                lineHeight = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = (-0.15).sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = item.countLabel,
-                color = item.color,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1
+                color = palette.textSecondary,
+                fontFamily = VennelaFonts.Sans,
+                fontSize = 11.sp,
+                lineHeight = 13.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
+
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = palette.textTertiary,
+            modifier = Modifier.size(16.dp)
+        )
     }
 }
 
-/* ------------------------------------------------------------------------- */
-/* 5. Horizontal 3D Kinetic Carousel of Recent Files                         */
-/* ------------------------------------------------------------------------- */
-
 @Composable
-private fun RecentFilesKineticCarousel(
+private fun RecentFilesGlassCard(
     recentFiles: List<FileItem>,
     onFileClick: (FileItem) -> Unit,
+    onMoreClick: (FileItem) -> Unit,
+    onOpenFileClick: () -> Unit,
     onBrowseClick: () -> Unit
 ) {
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
 
-    val display = recentFiles.take(8)
-
-    if (display.isEmpty()) {
-        GlassPanel(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp)
-        ) {
-            VennelaEmptyState(
-                title = "Zero Cache Latency",
-                hint = "Select any document, database, or archive to view offline.",
-                icon = Icons.Default.FolderOpen,
-                actionLabel = "Explore Device Storage",
-                onAction = onBrowseClick
-            )
-        }
-    } else {
-        LazyRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp)
-        ) {
-            itemsIndexed(display) { index, file ->
-                RecentFile3DCard(
-                    file = file,
-                    index = index,
-                    onClick = { onFileClick(file) }
+    GlassPanel(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(VennelaTokens.radiusCard),
+        alpha = if (palette.isDark) 0.44f else 0.72f
+    ) {
+        if (recentFiles.isEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 22.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(accent.primary.copy(alpha = 0.16f))
+                        .border(1.dp, accent.secondary.copy(alpha = 0.35f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.FolderOpen,
+                        contentDescription = null,
+                        tint = accent.secondary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "No recent files yet",
+                    color = palette.textPrimary,
+                    fontFamily = VennelaFonts.Sans,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold
                 )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Open any document, spreadsheet, PDF, or archive on your device.",
+                    color = palette.textSecondary,
+                    fontFamily = VennelaFonts.Sans,
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    LiquidButton(
+                        label = "Open File",
+                        icon = Icons.Default.Description,
+                        onClick = onOpenFileClick,
+                        fillWidth = false,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(VennelaTokens.radiusPill))
+                            .background(palette.cardSurfaceStrong.copy(alpha = 0.65f))
+                            .border(1.dp, palette.cardBorder, RoundedCornerShape(VennelaTokens.radiusPill))
+                            .pressScale(pressedScale = 0.96f, onClick = onBrowseClick)
+                            .padding(vertical = 13.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Browse Storage",
+                            color = palette.textPrimary,
+                            fontFamily = VennelaFonts.Sans,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                val context = LocalContext.current
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(VennelaTokens.radiusPill))
+                        .background(accent.primary.copy(alpha = 0.16f))
+                        .border(0.75.dp, accent.secondary.copy(alpha = 0.50f), RoundedCornerShape(VennelaTokens.radiusPill))
+                        .pressScale(pressedScale = 0.97f) {
+                            val pdfFile = generateShowcasePdf(context)
+                            onFileClick(
+                                FileItem(
+                                    id = Uri.fromFile(pdfFile).toString(),
+                                    name = pdfFile.name,
+                                    uri = Uri.fromFile(pdfFile),
+                                    extension = "pdf",
+                                    sizeBytes = pdfFile.length(),
+                                    formatInfo = FormatRegistry.lookup("pdf")
+                                )
+                            )
+                        }
+                        .padding(vertical = 11.dp, horizontal = 16.dp)
+                        .testTag("home_launch_pdf_showcase"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Launch 5-Page Pro PDF Studio Showcase →",
+                        color = accent.secondary,
+                        fontFamily = VennelaFonts.Sans,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                }
+            }
+        } else {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                recentFiles.forEachIndexed { index, file ->
+                    RecentFileRow(
+                        file = file,
+                        onClick = { onFileClick(file) },
+                        onMoreClick = { onMoreClick(file) },
+                        modifier = Modifier.staggeredEntrance(index)
+                    )
+                    if (index < recentFiles.lastIndex) {
+                        GlassDivider()
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun RecentFile3DCard(
+private fun RecentFileRow(
     file: FileItem,
-    index: Int,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onMoreClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val palette = LocalVennelaPalette.current
-    val accent = LocalVennelaAccent.current
-    val shape = RoundedCornerShape(22.dp)
-
-    Box(
-        modifier = Modifier
-            .width(152.dp)
-            .height(174.dp)
-            .staggeredEntrance(index)
-            .shadow(
-                elevation = 12.dp,
-                shape = shape,
-                clip = false,
-                ambientColor = accent.secondary.copy(alpha = 0.25f),
-                spotColor = accent.primary.copy(alpha = 0.25f)
-            )
-            .clip(shape)
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        palette.cardSurfaceStrong.copy(alpha = 0.92f),
-                        palette.cardSurface.copy(alpha = 0.75f)
-                    )
-                )
-            )
-            .border(
-                1.dp,
-                Brush.verticalGradient(
-                    listOf(
-                        Color.White.copy(alpha = 0.28f),
-                        accent.secondary.copy(alpha = 0.22f),
-                        Color.Transparent
-                    )
-                ),
-                shape
-            )
-            .pressScale(pressedScale = 0.94f, onClick = onClick)
-            .padding(14.dp)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .pressScale(pressedScale = 0.985f, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            // Top: Brand badge or image preview
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                if (file.uri != null && isImage(file.extension)) {
-                    AsyncImage(
-                        model = file.uri,
-                        contentDescription = file.name,
-                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                        modifier = Modifier
-                            .size(46.dp)
-                            .clip(RoundedCornerShape(13.dp))
-                            .background(palette.textPrimary.copy(alpha = 0.08f))
-                            .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(13.dp))
-                    )
-                } else {
-                    FileBrandBadge(extension = file.extension, size = 46.dp)
-                }
+        if (file.uri != null && isImage(file.extension)) {
+            AsyncImage(
+                model = file.uri,
+                contentDescription = file.name,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(palette.cardSurfaceStrong)
+                    .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
+            )
+        } else {
+            FileBrandBadge(extension = file.extension, size = 44.dp)
+        }
 
-                // Extension tag pill
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(accent.secondary.copy(alpha = 0.16f))
-                        .border(1.dp, accent.secondary.copy(alpha = 0.45f), RoundedCornerShape(50))
-                        .padding(horizontal = 7.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = file.extension.uppercase().take(4),
-                        color = accent.secondary,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                }
-            }
+        Spacer(modifier = Modifier.width(12.dp))
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Middle: File Title
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = file.name,
                 color = palette.textPrimary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Bottom: Size and date
-            Text(
-                text = "${file.formattedSize} • ${file.formattedDate}",
-                color = palette.textSecondary,
-                fontSize = 10.sp,
+                fontFamily = VennelaFonts.Sans,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-        }
-    }
-}
-
-/* ------------------------------------------------------------------------- */
-/* 6. Device Hardware Storage Console                                        */
-/* ------------------------------------------------------------------------- */
-
-@Composable
-private fun HomeStorageConsole(
-    volumes: List<StorageVolumeInfo>,
-    granted: Boolean,
-    onOpenAll: () -> Unit,
-    onOpenVolume: (String) -> Unit
-) {
-    val palette = LocalVennelaPalette.current
-    val accent = LocalVennelaAccent.current
-    val shape = RoundedCornerShape(26.dp)
-
-    GlassCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(
-                elevation = 16.dp,
-                shape = shape,
-                clip = false,
-                ambientColor = accent.secondary.copy(alpha = 0.30f),
-                spotColor = accent.primary.copy(alpha = 0.30f)
-            ),
-        shape = shape,
-        elevation = 8.dp,
-        alpha = 0.50f
-    ) {
-        if (volumes.isEmpty()) {
+            Spacer(modifier = Modifier.height(2.dp))
+            val typeLabel = file.extension.uppercase().ifBlank { "FILE" }
             Text(
-                text = "Scanning Hardware Volumes…",
-                color = palette.textPrimary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = "Direct POSIX memory-mapped access initializing.",
+                text = "$typeLabel • ${file.formattedSize} • ${file.formattedDate}",
                 color = palette.textSecondary,
-                fontSize = 12.sp
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            LiquidButton(
-                label = "Open File Explorer",
-                icon = Icons.Default.FolderOpen,
-                onClick = onOpenAll,
-                fillWidth = true
-            )
-            return@GlassCard
-        }
-
-        volumes.forEachIndexed { index, volume ->
-            Column(modifier = Modifier.staggeredEntrance(index)) {
-                VolumeConsoleRow(volume = volume, onOpen = { volume.rootPath?.let(onOpenVolume) })
-                if (index < volumes.lastIndex) GlassDivider()
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(6.dp)
-                    .clip(CircleShape)
-                    .background(if (granted) accent.secondary else Color(0xFFFFAB00))
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = if (granted) "All files access active • Zero sandbox limitations"
-                else "Limited access — grant all files access to browse everything",
-                color = if (granted) accent.secondary else Color(0xFFFFAB00),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.weight(1f)
-            )
-        }
-        Spacer(modifier = Modifier.height(12.dp))
-        LiquidButton(
-            label = "Open Root File Manager",
-            icon = Icons.Default.FolderOpen,
-            onClick = onOpenAll,
-            fillWidth = true
-        )
-    }
-}
-
-@Composable
-private fun VolumeConsoleRow(volume: StorageVolumeInfo, onOpen: () -> Unit) {
-    val palette = LocalVennelaPalette.current
-    val accent = LocalVennelaAccent.current
-    val fraction by animateFloatAsState(
-        targetValue = volume.usedFraction.coerceIn(0f, 1f),
-        animationSpec = LiquidMotion.emphasis(LiquidMotion.durationHero),
-        label = "volumeFill"
-    )
-    val icon = when (volume.kind) {
-        VolumeKind.INTERNAL -> Icons.Default.Memory
-        VolumeKind.SD_CARD -> Icons.Default.SdCard
-        VolumeKind.USB_OTG -> Icons.Default.Usb
-        VolumeKind.UNKNOWN -> Icons.Default.Folder
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .then(if (volume.isBrowsable) Modifier.pressScale(0.98f, onOpen) else Modifier)
-            .padding(vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconBadge(
-            icon = icon,
-            colors = listOf(accent.primary, accent.secondary),
-            size = 38.dp,
-            radius = 12.dp,
-            contentDescription = null
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = volume.label,
-                color = palette.textPrimary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            // Illuminated Multi-Segment Liquid Gauge
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(palette.cardBorder.copy(alpha = 0.25f))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(fraction)
-                        .height(6.dp)
-                        .shadow(
-                            elevation = 8.dp,
-                            shape = RoundedCornerShape(50),
-                            clip = false,
-                            ambientColor = accent.secondary.copy(alpha = 0.65f),
-                            spotColor = accent.primary.copy(alpha = 0.65f)
-                        )
-                        .clip(RoundedCornerShape(50))
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(
-                                    accent.primary,
-                                    accent.secondary,
-                                    Color.White.copy(alpha = 0.60f)
-                                )
-                            )
-                        )
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = if (volume.totalBytes > 0L) {
-                    "${homeBytes(volume.freeBytes)} free of ${homeBytes(volume.totalBytes)}"
-                } else {
-                    if (volume.isBrowsable) "Mounted & Ready" else "Not mounted"
-                },
-                color = palette.textSecondary,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium
-            )
-        }
-    }
-}
-
-private fun homeBytes(bytes: Long): String {
-    if (bytes <= 0L) return "0 B"
-    val kb = bytes / 1024.0
-    if (kb < 1024) return String.format("%.1f KB", kb)
-    val mb = kb / 1024.0
-    if (mb < 1024) return String.format("%.1f MB", mb)
-    val gb = mb / 1024.0
-    if (gb < 1024) return String.format("%.2f GB", gb)
-    return String.format("%.2f TB", gb / 1024.0)
-}
-
-/* ------------------------------------------------------------------------- */
-/* 7. System Engine Status Footer                                            */
-/* ------------------------------------------------------------------------- */
-
-@Composable
-private fun EngineStatusFooter(
-    palette: com.vennela365.viewer.theme.VennelaPalette,
-    accent: com.vennela365.viewer.theme.VennelaAccent,
-    onOpen: () -> Unit
-) {
-    val shape = RoundedCornerShape(50)
-    val pulse by rememberInfiniteTransition(label = "footerPulse").animateFloat(
-        initialValue = 0.6f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = LiquidMotion.shimmer(1500),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "footerPulseAlpha"
-    )
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 4.dp, bottom = 8.dp)
-            .shadow(
-                elevation = 14.dp,
-                shape = shape,
-                clip = false,
-                ambientColor = accent.secondary.copy(alpha = 0.35f),
-                spotColor = accent.primary.copy(alpha = 0.35f)
-            )
-            .clip(shape)
-            .background(
-                Brush.horizontalGradient(
-                    listOf(
-                        accent.primary.copy(alpha = 0.25f),
-                        accent.secondary.copy(alpha = 0.12f),
-                        palette.cardSurface.copy(alpha = 0.60f)
-                    )
-                )
-            )
-            .border(1.dp, Color.White.copy(alpha = 0.22f), shape)
-            .pressScale(pressedScale = 0.98f, onClick = onOpen)
-            .padding(horizontal = 18.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .graphicsLayer {
-                        scaleX = pulse
-                        scaleY = pulse
-                        alpha = pulse
-                    }
-                    .clip(CircleShape)
-                    .background(Color(0xFF00E676))
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "Air-Gapped Privacy • 0ms Vello Strips",
-                color = palette.textPrimary,
+                fontFamily = VennelaFonts.Sans,
                 fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(50))
-                .background(accent.secondary.copy(alpha = 0.20f))
-                .border(1.dp, accent.secondary.copy(alpha = 0.60f), RoundedCornerShape(50))
-                .padding(horizontal = 8.dp, vertical = 2.dp)
+
+        if (file.isFavorite) {
+            Icon(
+                imageVector = Icons.Default.Favorite,
+                contentDescription = "Favorite",
+                tint = CatRose,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+        }
+
+        IconButton(
+            onClick = onMoreClick,
+            modifier = Modifier.size(40.dp)
         ) {
-            Text(
-                text = "120 FPS",
-                color = accent.secondary,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.ExtraBold
+            Icon(
+                imageVector = Icons.Default.MoreVert,
+                contentDescription = "File details",
+                tint = palette.textSecondary,
+                modifier = Modifier.size(18.dp)
             )
         }
     }

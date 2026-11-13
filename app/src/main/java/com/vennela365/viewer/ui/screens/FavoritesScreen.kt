@@ -59,6 +59,10 @@ import com.vennela365.viewer.theme.CatAmber
 import com.vennela365.viewer.theme.LiquidMotion
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.platform.testTag
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.theme.liquidGlass
 import com.vennela365.viewer.theme.liquidGlassSpec
@@ -156,9 +160,15 @@ fun FavoritesScreen(viewModel: MainViewModel) {
             )
         }
     ) { pagePadding ->
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.TopCenter
+        ) {
         LazyColumn(
             state = favoritesListState,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = 860.dp),
             contentPadding = PaddingValues(
                 top = VennelaTokens.spaceSm,
                 bottom = pagePadding.calculateBottomPadding()
@@ -242,7 +252,10 @@ fun FavoritesScreen(viewModel: MainViewModel) {
                         index = index,
                         onClick = { viewModel.openFile(file) },
                         onToggleStar = { viewModel.toggleFavorite(file) },
-                        onMoreClick = { viewModel.openFile(file) }
+                        onMoreClick = {
+                            viewModel.selectFile(file)
+                            viewModel.navigateTo(Screen.FileMetadata)
+                        }
                     )
                 }
             }
@@ -252,6 +265,7 @@ fun FavoritesScreen(viewModel: MainViewModel) {
                     Text(
                         text = "Tap the star to remove a file · ${favoriteFiles.size} saved on this device",
                         color = palette.textTertiary,
+                        fontFamily = VennelaFonts.Sans,
                         fontSize = VennelaTokens.micro,
                         modifier = Modifier.padding(
                             start = VennelaTokens.gutter,
@@ -261,6 +275,7 @@ fun FavoritesScreen(viewModel: MainViewModel) {
                     )
                 }
             }
+        }
         }
     }
 }
@@ -405,6 +420,7 @@ private fun FavoritesHeroHeader(
         FavoritesActionButton(
             icon = Icons.Default.Search,
             description = "Search files",
+            modifier = Modifier.testTag("favorites_search_button"),
             onClick = onSearch
         )
         Spacer(modifier = Modifier.width(VennelaTokens.spaceSm))
@@ -412,6 +428,7 @@ private fun FavoritesHeroHeader(
             FavoritesActionButton(
                 icon = Icons.AutoMirrored.Filled.Sort,
                 description = "Sort favorites",
+                modifier = Modifier.testTag("favorites_sort_button"),
                 onClick = { onSortMenuOpenChange(true) }
             )
             DropdownMenu(
@@ -454,12 +471,13 @@ private fun FavoritesHeroHeader(
 private fun FavoritesActionButton(
     icon: ImageVector,
     description: String,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(VennelaTokens.touchTargetMin)
             .shadow(
                 elevation = 12.dp,
@@ -549,6 +567,7 @@ fun FavoriteFileCard(
                 Text(
                     text = file.name,
                     color = palette.textPrimary,
+                    fontFamily = VennelaFonts.Sans,
                     fontSize = VennelaTokens.titleSmall,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
@@ -556,14 +575,20 @@ fun FavoriteFileCard(
                 )
                 Spacer(modifier = Modifier.height(VennelaTokens.spaceXxs))
                 Text(
-                    text = "${file.extension.uppercase()} • ${file.formattedSize} • ${file.formattedDate}",
+                    text = "${file.extension.uppercase()} · ${file.formattedSize} · ${file.formattedDate}",
                     color = palette.textSecondary,
+                    fontFamily = VennelaFonts.Mono,
                     fontSize = VennelaTokens.caption,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            IconButton(onClick = onToggleStar) {
+            IconButton(
+                onClick = onToggleStar,
+                modifier = Modifier
+                    .size(VennelaTokens.touchTargetMin)
+                    .testTag("favorites_star_button_${file.id}")
+            ) {
                 Box(
                     modifier = Modifier
                         .size(VennelaTokens.badgeSm)
@@ -594,7 +619,12 @@ fun FavoriteFileCard(
                     )
                 }
             }
-            IconButton(onClick = onMoreClick) {
+            IconButton(
+                onClick = onMoreClick,
+                modifier = Modifier
+                    .size(VennelaTokens.touchTargetMin)
+                    .testTag("favorites_more_button_${file.id}")
+            ) {
                 Box(
                     modifier = Modifier
                         .size(VennelaTokens.badgeSm)

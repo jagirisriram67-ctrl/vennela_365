@@ -504,7 +504,8 @@ object FormatRegistry {
 
         // ---- V. Playlists / captions ----
         for (e in listOf("m3u", "m3u8", "pls", "xspf", "wpl", "asx", "cue", "srt", "vtt", "webvtt", "ass", "ssa", "sub", "idx", "sbv", "lrc", "smi", "sami", "ttml", "dfxp", "stl")) {
-            add(S(e, "${e.uppercase()} Playlist / Subtitle", C.AUDIO, "text/plain", L.TEXT_EXTRACTABLE, "Timed Subtitle / Playlist Engine"))
+            val lvl = if (e in setOf("srt", "vtt", "webvtt", "ass", "ssa", "lrc", "m3u", "m3u8", "pls")) L.FULLY_RENDERED else L.TEXT_EXTRACTABLE
+            add(S(e, "${e.uppercase()} Playlist / Subtitle", C.AUDIO, "text/plain", lvl, "Timed Subtitle / Playlist Engine"))
         }
 
         // ---- W. Archives ----
@@ -560,13 +561,15 @@ object FormatRegistry {
         // ---- AC. CAD / 3D ----
         for (e in listOf("stl", "obj", "mtl", "fbx", "dae", "3ds", "ply", "off", "wrl", "vrml", "x3d", "3mf", "amf", "step", "stp", "iges", "igs", "dwg", "dxf", "dgn", "skp", "3dm", "sldprt", "sldasm", "slddrw", "ipt", "iam", "idw", "prt", "asm", "sat", "sab", "jt", "usd", "usda", "usdc", "usdz", "abc", "ma", "mb", "max", "c4d", "lwo", "lws", "ifc")) {
             val lvl = if (e in setOf("obj", "stl")) L.PREVIEWABLE else L.METADATA_READABLE
-            add(S(e, "${e.uppercase()} CAD / 3D Model", C.CAD_3D, "model/$e", lvl, R_META, "Geometry preview only with tested renderer; else metadata"))
+            val renderer = if (e in setOf("obj", "stl")) "3D Wireframe Canvas Engine" else R_META
+            add(S(e, "${e.uppercase()} CAD / 3D Model", C.CAD_3D, "model/$e", lvl, renderer, "Interactive 3D wireframe for OBJ/ASCII STL; metadata for proprietary CAD"))
         }
 
         // ---- AD. GIS / maps ----
         for (e in listOf("shp", "shx", "prj", "cpg", "gpkg", "gpx", "kml", "kmz", "geotiff", "dem", "vrt", "mbtiles", "pbf", "osm", "laz", "las", "e57", "3dtiles")) {
-            val lvl = if (e in setOf("gpx", "kml", "geojson")) L.PREVIEWABLE else L.METADATA_READABLE
-            add(S(e, "${e.uppercase()} Geospatial Data", C.CAD_3D, "application/octet-stream", lvl, R_META, "No location permission for inspection"))
+            val lvl = if (e in setOf("gpx", "kml", "geojson")) L.FULLY_RENDERED else L.METADATA_READABLE
+            val renderer = if (e in setOf("gpx", "kml", "geojson")) "Vector Coordinate Plotter" else R_META
+            add(S(e, "${e.uppercase()} Geospatial Data", C.CAD_3D, "application/octet-stream", lvl, renderer, "Offline route & waypoint plotter; no location permission requested"))
         }
 
         // ---- AE. Logs / diagnostics ----

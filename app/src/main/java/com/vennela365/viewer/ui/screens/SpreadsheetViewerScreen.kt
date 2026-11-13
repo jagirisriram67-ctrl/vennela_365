@@ -2,14 +2,18 @@ package com.vennela365.viewer.ui.screens
 
 import android.content.Intent
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,6 +29,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
@@ -39,6 +44,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FilterList
@@ -49,6 +55,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.automirrored.filled.ManageSearch
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.automirrored.filled.Sort
@@ -67,11 +74,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -89,29 +105,45 @@ import com.vennela365.viewer.model.SpreadsheetSheet
 import com.vennela365.viewer.parser.SpreadsheetParser
 import com.vennela365.viewer.rendering.ViewerState
 import com.vennela365.viewer.storage.ShareUri
+import com.vennela365.viewer.theme.CatAmber
+import com.vennela365.viewer.theme.CatBlue
+import com.vennela365.viewer.theme.CatCyan
+import com.vennela365.viewer.theme.CatEmerald
+import com.vennela365.viewer.theme.CatRose
+import com.vennela365.viewer.theme.CatViolet
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
+import com.vennela365.viewer.theme.errorCoral
 import com.vennela365.viewer.theme.liquidGlass
 import com.vennela365.viewer.theme.liquidGlassSpec
+import com.vennela365.viewer.theme.successTeal
+import com.vennela365.viewer.theme.warningAmber
 import com.vennela365.viewer.ui.components.GlassDivider
 import com.vennela365.viewer.ui.components.GlassListRow
 import com.vennela365.viewer.ui.components.GlassPanel
 import com.vennela365.viewer.ui.components.LiquidChip
 import com.vennela365.viewer.ui.components.LiquidPage
-import com.vennela365.viewer.ui.components.ViewerTopBar
 import com.vennela365.viewer.ui.components.ReaderBottomPill
 import com.vennela365.viewer.ui.components.ReaderIconButton
 import com.vennela365.viewer.ui.components.ReaderTopToolbar
 import com.vennela365.viewer.ui.components.SectionHeader
+import com.vennela365.viewer.ui.components.SuiteCommandHeader
 import com.vennela365.viewer.ui.components.VennelaEmptyState
 import com.vennela365.viewer.ui.components.VennelaErrorState
 import com.vennela365.viewer.ui.components.VennelaLoadingState
 import com.vennela365.viewer.ui.components.VennelaSearchField
+import com.vennela365.viewer.ui.components.VennelaSegmentedControl
+import com.vennela365.viewer.ui.components.ViewerKind
+import com.vennela365.viewer.ui.components.ViewerTopBar
 import com.vennela365.viewer.ui.components.pressScale
+import com.vennela365.viewer.ui.components.rememberSuiteSessionState
 import com.vennela365.viewer.viewmodel.MainViewModel
 import com.vennela365.viewer.viewmodel.Screen
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
 import kotlin.math.abs
 
@@ -160,6 +192,7 @@ private enum class SheetDensity(
 
 private enum class SheetMode(val label: String, val icon: ImageVector) {
     SHEET("Grid", Icons.Default.TableChart),
+    CHART("Charts", Icons.Default.BarChart),
     STATS("Stats", Icons.Default.Calculate),
     DATA("Rows", Icons.Default.FilterList)
 }
@@ -259,9 +292,11 @@ fun SpreadsheetViewerScreen(viewModel: MainViewModel) {
     val sheets by viewModel.spreadsheetSheets.collectAsState()
     val selectedFile by viewModel.selectedFile.collectAsState()
     val viewerState by viewModel.viewerState.collectAsState()
+    val activeSuite by viewModel.preferredSuiteStyle.collectAsState()
     val context = LocalContext.current
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
+    val suiteSession = rememberSuiteSessionState(activeSuite, palette.isDark)
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
 
@@ -424,6 +459,30 @@ fun SpreadsheetViewerScreen(viewModel: MainViewModel) {
         }
     }
 
+    val exportCsvLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        val sheet = currentSheet ?: return@rememberLauncherForActivityResult
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val savedOk = withContext(Dispatchers.IO) {
+                runCatching {
+                    val csv = buildCsvExport(sheet, viewRows)
+                    context.contentResolver.openOutputStream(uri)?.use { out ->
+                        out.write(csv.toByteArray(Charsets.UTF_8))
+                        out.flush()
+                    }
+                    true
+                }.getOrDefault(false)
+            }
+            Toast.makeText(
+                context,
+                if (savedOk) "Exported ${sheet.name}.csv" else "Could not export CSV",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
     LiquidPage(
         title = null,
         dock = {
@@ -431,7 +490,10 @@ fun SpreadsheetViewerScreen(viewModel: MainViewModel) {
                 mode = selectedMode,
                 findOpen = findOpen,
                 onShare = { shareSheet() },
-                onOpenWith = { openWith() },
+                onExportCsv = {
+                    val base = selectedFile?.name?.substringBeforeLast('.')?.ifBlank { "sheet" } ?: "sheet"
+                    exportCsvLauncher.launch("$base.csv")
+                },
                 onFind = {
                     findOpen = !findOpen
                     if (findOpen) selectedMode = SheetMode.SHEET
@@ -441,37 +503,51 @@ fun SpreadsheetViewerScreen(viewModel: MainViewModel) {
             )
         }
     ) { pagePadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            // Floating, slim sheet toolbar — the grid keeps the whole screen.
-            ViewerTopBar(
-                title = selectedFile?.name ?: "Spreadsheet",
-                subtitle = "${selectedFile?.formatInfo?.name ?: "Spreadsheet"} • " +
-                    "${selectedFile?.formattedSize ?: "No file selected"}",
-                onBack = { viewModel.navigateBack() },
-                modifier = Modifier.padding(horizontal = VennelaTokens.gutter)
-            ) {
-                ReaderIconButton(
-                    icon = Icons.Default.Search,
-                    contentDescription = "Search files",
-                    onClick = { viewModel.navigateTo(Screen.UniversalSearch) }
-                )
-                Spacer(Modifier.width(VennelaTokens.spaceXs))
-                ReaderIconButton(
-                    icon = Icons.Default.Info,
-                    contentDescription = "File details",
-                    onClick = { viewModel.navigateTo(Screen.FileMetadata) }
-                )
-            }
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(
-                    top = pagePadding.calculateTopPadding() + VennelaTokens.viewerTopInset,
+                    top = pagePadding.calculateTopPadding(),
                     bottom = pagePadding.calculateBottomPadding()
                 )
-                .padding(horizontal = VennelaTokens.gutter)
         ) {
+            SuiteCommandHeader(
+                kind = ViewerKind.SHEETS,
+                fileName = selectedFile?.name ?: "Spreadsheet",
+                subtitle = "${selectedFile?.formatInfo?.name ?: "Workbook"} • ${sheets.size.coerceAtLeast(1)} sheets • $totalRows rows",
+                activeSuite = activeSuite,
+                onSelectSuite = { viewModel.setPreferredSuiteStyle(it) },
+                session = suiteSession,
+                progress = 1f,
+                zoomPercent = if (densityMode == SheetDensity.COMFORTABLE) 100 else 85,
+                onBack = { viewModel.navigateBack() },
+                onSearchToggle = {
+                    findOpen = !findOpen
+                    if (findOpen) selectedMode = SheetMode.SHEET
+                },
+                onOutlineToggle = {
+                    selectedMode = if (selectedMode == SheetMode.STATS) SheetMode.SHEET else SheetMode.STATS
+                },
+                onShare = { shareSheet() },
+                onExportPdf = {
+                    val base = selectedFile?.name?.substringBeforeLast('.')?.ifBlank { "sheet" } ?: "sheet"
+                    exportCsvLauncher.launch("$base.csv")
+                },
+                onPrint = { openWith() },
+                onZoomChange = { delta ->
+                    densityMode = if (delta > 0) SheetDensity.COMFORTABLE else SheetDensity.COMPACT
+                },
+                onTextScaleChange = { delta ->
+                    densityMode = if (delta > 0) SheetDensity.COMFORTABLE else SheetDensity.COMPACT
+                }
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = VennelaTokens.gutter)
+                    .padding(top = VennelaTokens.spaceSm)
+            ) {
             SheetControlRail(
                 selectedMode = selectedMode,
                 density = densityMode,
@@ -490,7 +566,10 @@ fun SpreadsheetViewerScreen(viewModel: MainViewModel) {
                         sortAscending = true
                     }
                 },
-                onInfo = { viewModel.navigateTo(Screen.FileMetadata) }
+                onExportCsv = {
+                    val base = selectedFile?.name?.substringBeforeLast('.')?.ifBlank { "sheet" } ?: "sheet"
+                    exportCsvLauncher.launch("$base.csv")
+                }
             )
 
             Spacer(Modifier.height(VennelaTokens.spaceSm))
@@ -532,12 +611,18 @@ fun SpreadsheetViewerScreen(viewModel: MainViewModel) {
                 }
 
                 else -> {
+                    val activeRangeStats = remember(currentSheet, selection) {
+                        selection?.let { computeRangeStats(currentSheet, it, RangeStatsCap) }
+                    }
                     SheetFormulaBar(
                         address = addressInput,
                         rawValue = activeCell?.value.orEmpty(),
                         selectionLabel = selection?.let { range ->
                             if (range.isSingle) null
                             else "${range.cellCount} cells • ${range.address}"
+                        },
+                        quickSummary = activeRangeStats?.let { st ->
+                            "SUM ${formatNumber(st.sum)}  •  AVG ${formatNumber(st.mean)}  •  MIN ${formatNumber(st.min)}  •  MAX ${formatNumber(st.max)}"
                         },
                         hasSelection = selection != null,
                         onAddressChange = { addressInput = it },
@@ -626,16 +711,20 @@ fun SpreadsheetViewerScreen(viewModel: MainViewModel) {
                             )
                         }
 
+                        SheetMode.CHART -> SheetChartsSection(
+                            sheet = currentSheet,
+                            numericColumns = numericColumns,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                        )
+
                         SheetMode.STATS -> SheetStatsSection(
                             sheetName = currentSheet.name,
                             scannedRows = minOf(currentSheet.rows.size, StatsScanCap),
                             totalRows = currentSheet.rows.size,
                             columns = numericColumns,
-                            selectionStats = if (selection == null) null else computeRangeStats(
-                                currentSheet,
-                                selection!!,
-                                RangeStatsCap
-                            ),
+                            selectionStats = activeRangeStats,
                             selectionAddress = selection?.address,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -763,6 +852,25 @@ private fun formatNumber(value: Double): String {
     }
 }
 
+private fun buildCsvExport(sheet: SpreadsheetSheet, rows: List<List<SpreadsheetCell>>): String {
+    fun escape(raw: String): String {
+        val clean = raw.replace("\r", " ").replace("\n", " ")
+        return if (clean.contains(',') || clean.contains('"')) {
+            "\"${clean.replace("\"", "\"\"")}\""
+        } else {
+            clean
+        }
+    }
+    val out = StringBuilder(4096)
+    if (sheet.headers.isNotEmpty()) {
+        out.append(sheet.headers.joinToString(",") { escape(it) }).append('\n')
+    }
+    for (row in rows.take(MaxGridRows)) {
+        out.append(row.joinToString(",") { escape(it.value) }).append('\n')
+    }
+    return out.toString()
+}
+
 /* ------------------------------------------------------------------------- */
 /* Chrome                                                                     */
 /* ------------------------------------------------------------------------- */
@@ -786,7 +894,7 @@ private fun SheetTopAction(icon: ImageVector, description: String, onClick: () -
     }
 }
 
-/** Mode / density / sort rail. A LazyRow so pills never clip on narrow devices. */
+/** Segmented mode switcher + compact density/sort/export rail matching reference screen 25. */
 @Composable
 private fun SheetControlRail(
     selectedMode: SheetMode,
@@ -797,73 +905,74 @@ private fun SheetControlRail(
     onModeChange: (SheetMode) -> Unit,
     onDensityChange: (SheetDensity) -> Unit,
     onToggleSort: () -> Unit,
-    onInfo: () -> Unit
+    onExportCsv: () -> Unit
 ) {
-    LazyRow(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(VennelaTokens.spaceSm),
-        contentPadding = PaddingValues(vertical = VennelaTokens.spaceXs)
+        verticalArrangement = Arrangement.spacedBy(VennelaTokens.spaceXs)
     ) {
-        items(SheetMode.entries.size, key = { "mode_${SheetMode.entries[it].name}" }) { index ->
-            val mode = SheetMode.entries[index]
-            LiquidChip(
-                text = mode.label,
-                icon = mode.icon,
-                isActive = selectedMode == mode,
-                onClick = { onModeChange(mode) },
-                modifier = Modifier.heightIn(min = VennelaTokens.touchTargetMin)
-            )
-        }
-        items(SheetDensity.entries.size, key = { "density_${SheetDensity.entries[it].name}" }) { index ->
-            val option = SheetDensity.entries[index]
-            LiquidChip(
-                text = option.label,
-                isActive = density == option,
-                onClick = { onDensityChange(option) },
-                modifier = Modifier.heightIn(min = VennelaTokens.touchTargetMin)
-            )
-        }
-        item(key = "sort") {
-            LiquidChip(
-                text = if (sortColumn < 0) "Sort" else "Sort ${columnName(sortColumn)}",
-                icon = when {
-                    sortColumn < 0 -> Icons.AutoMirrored.Filled.Sort
-                    sortAscending -> Icons.Default.ArrowUpward
-                    else -> Icons.Default.ArrowDownward
-                },
-                isActive = sortColumn >= 0,
-                onClick = onToggleSort,
-                modifier = Modifier.heightIn(min = VennelaTokens.touchTargetMin)
-            )
-        }
-        item(key = "info") {
-            LiquidChip(
-                text = "Info",
-                icon = Icons.Default.Info,
-                isActive = false,
-                onClick = onInfo,
-                modifier = Modifier.heightIn(min = VennelaTokens.touchTargetMin)
-            )
-        }
-        if (hasSheet) {
-            item(key = "grid_hint") {
+        VennelaSegmentedControl(
+            options = SheetMode.entries.map { it.label },
+            selected = selectedMode.label,
+            onSelect = { label ->
+                SheetMode.entries.firstOrNull { it.label == label }?.let(onModeChange)
+            },
+            modifier = Modifier
+                .widthIn(max = 560.dp)
+                .align(Alignment.CenterHorizontally)
+                .testTag("sheet_mode_segmented")
+        )
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(VennelaTokens.spaceSm),
+            contentPadding = PaddingValues(vertical = VennelaTokens.spaceXxs)
+        ) {
+            items(SheetDensity.entries.size, key = { "density_${SheetDensity.entries[it].name}" }) { index ->
+                val option = SheetDensity.entries[index]
                 LiquidChip(
-                    text = "Tap a column letter to sort",
-                    icon = Icons.Default.GridOn,
-                    isActive = false,
-                    onClick = {}
+                    text = option.label,
+                    isActive = density == option,
+                    onClick = { onDensityChange(option) },
+                    modifier = Modifier.heightIn(min = VennelaTokens.touchTargetCompact)
                 )
+            }
+            item(key = "sort") {
+                LiquidChip(
+                    text = if (sortColumn < 0) "Sort" else "Sort ${columnName(sortColumn)}",
+                    icon = when {
+                        sortColumn < 0 -> Icons.AutoMirrored.Filled.Sort
+                        sortAscending -> Icons.Default.ArrowUpward
+                        else -> Icons.Default.ArrowDownward
+                    },
+                    isActive = sortColumn >= 0,
+                    onClick = onToggleSort,
+                    modifier = Modifier.heightIn(min = VennelaTokens.touchTargetCompact)
+                )
+            }
+            if (hasSheet) {
+                item(key = "export_csv") {
+                    LiquidChip(
+                        text = "Export CSV",
+                        icon = Icons.Default.SaveAlt,
+                        isActive = false,
+                        onClick = onExportCsv,
+                        modifier = Modifier
+                            .heightIn(min = VennelaTokens.touchTargetCompact)
+                            .testTag("sheet_export_csv_chip")
+                    )
+                }
             }
         }
     }
 }
 
-/** Frosted address box + formula bar for the active cell. */
+/** Frosted address box + monospace formula bar with live selection calculations. */
 @Composable
 private fun SheetFormulaBar(
     address: String,
     rawValue: String,
     selectionLabel: String?,
+    quickSummary: String?,
     hasSelection: Boolean,
     onAddressChange: (String) -> Unit,
     onAddressSubmit: () -> Unit,
@@ -874,7 +983,7 @@ private fun SheetFormulaBar(
     GlassPanel(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(VennelaTokens.radiusControl),
-        alpha = 0.40f,
+        alpha = 0.42f,
         elevation = VennelaTokens.elevationCard
     ) {
         Column(modifier = Modifier.padding(vertical = VennelaTokens.spaceSm)) {
@@ -887,7 +996,7 @@ private fun SheetFormulaBar(
                 Box(
                     modifier = Modifier
                         .width(VennelaTokens.badgeLg + VennelaTokens.spaceXl)
-                        .heightIn(min = VennelaTokens.touchTargetMin)
+                        .heightIn(min = VennelaTokens.touchTargetCompact)
                         .clip(RoundedCornerShape(VennelaTokens.radiusChip))
                         .background(accent.secondary.copy(alpha = 0.16f))
                         .border(
@@ -902,6 +1011,7 @@ private fun SheetFormulaBar(
                         Text(
                             text = "A1",
                             color = palette.textTertiary,
+                            fontFamily = VennelaFonts.Mono,
                             fontSize = VennelaTokens.micro,
                             fontWeight = FontWeight.Bold
                         )
@@ -912,6 +1022,7 @@ private fun SheetFormulaBar(
                         singleLine = true,
                         textStyle = TextStyle(
                             color = accent.secondary,
+                            fontFamily = VennelaFonts.Mono,
                             fontSize = VennelaTokens.micro,
                             fontWeight = FontWeight.Bold
                         ),
@@ -932,6 +1043,7 @@ private fun SheetFormulaBar(
                 Text(
                     text = "fx",
                     color = accent.secondary,
+                    fontFamily = VennelaFonts.Mono,
                     fontSize = VennelaTokens.bodySmall,
                     fontWeight = FontWeight.Bold
                 )
@@ -944,6 +1056,7 @@ private fun SheetFormulaBar(
                             if (hasSelection) "This cell is empty" else "Tap any cell to inspect its value"
                         },
                         color = if (rawValue.isNotBlank()) palette.textPrimary else palette.textTertiary,
+                        fontFamily = VennelaFonts.Mono,
                         fontSize = VennelaTokens.caption,
                         fontWeight = if (rawValue.isNotBlank()) FontWeight.Medium else FontWeight.Normal,
                         maxLines = 2,
@@ -977,6 +1090,22 @@ private fun SheetFormulaBar(
                         modifier = Modifier.size(VennelaTokens.iconSm)
                     )
                 }
+            }
+            if (quickSummary != null) {
+                Text(
+                    text = quickSummary,
+                    color = accent.secondary,
+                    fontFamily = VennelaFonts.Mono,
+                    fontSize = VennelaTokens.nano,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(
+                        start = VennelaTokens.spaceMd,
+                        end = VennelaTokens.spaceMd,
+                        top = VennelaTokens.spaceXs
+                    )
+                )
             }
         }
     }
@@ -1277,15 +1406,23 @@ private fun SheetDataCell(
 ) {
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
-    val value = cell?.value.orEmpty()
-    val tagColor = when (cell?.tagColor) {
-        "green" -> accent.secondary
-        "amber" -> accent.primary
-        "red" -> palette.textSecondary
-        null -> null
-        else -> palette.textSecondary
+    val value = cell?.value.orEmpty().trim()
+    val isNumeric = value.isNotEmpty() && SpreadsheetParser.cleanNumeric(value) != null
+    val lower = value.lowercase(Locale.US)
+    val inferredTagColor = when (cell?.tagColor) {
+        "green" -> successTeal
+        "amber" -> warningAmber
+        "red" -> errorCoral
+        null -> when {
+            lower in setOf("high", "active", "pass", "passed", "done", "paid", "ok") -> successTeal
+            lower in setOf("medium", "pending", "review", "warn") -> warningAmber
+            lower in setOf("low", "fail", "failed", "overdue", "error") -> errorCoral
+            else -> null
+        }
+        else -> null
     }
-    val negative = value.startsWith("-")
+    val positiveDelta = value.startsWith("+") && value.endsWith("%")
+    val negativeNumber = (value.startsWith("-") && (isNumeric || value.endsWith("%")))
 
     Box(
         modifier = Modifier
@@ -1314,13 +1451,18 @@ private fun SheetDataCell(
             }
             .pressScale(pressedScale = 0.96f, onClick = onClick)
             .padding(horizontal = VennelaTokens.spaceSm),
-        contentAlignment = Alignment.CenterStart
+        contentAlignment = if (isNumeric && inferredTagColor == null) Alignment.CenterEnd else Alignment.CenterStart
     ) {
-        if (tagColor != null && value.isNotBlank()) {
+        if (inferredTagColor != null && value.isNotBlank()) {
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(VennelaTokens.radiusChip))
-                    .background(tagColor.copy(alpha = 0.20f))
+                    .background(inferredTagColor.copy(alpha = 0.18f))
+                    .border(
+                        width = 0.8.dp,
+                        color = inferredTagColor.copy(alpha = 0.45f),
+                        shape = RoundedCornerShape(VennelaTokens.radiusChip)
+                    )
                     .padding(
                         horizontal = VennelaTokens.spaceSm,
                         vertical = VennelaTokens.spaceXxs
@@ -1328,7 +1470,8 @@ private fun SheetDataCell(
             ) {
                 Text(
                     text = value,
-                    color = tagColor,
+                    color = inferredTagColor,
+                    fontFamily = VennelaFonts.Sans,
                     fontSize = fontSize,
                     lineHeight = lineHeight,
                     fontWeight = FontWeight.Bold,
@@ -1339,10 +1482,16 @@ private fun SheetDataCell(
         } else {
             Text(
                 text = value,
-                color = if (negative) palette.textSecondary else palette.textPrimary,
+                color = when {
+                    positiveDelta -> successTeal
+                    negativeNumber -> errorCoral
+                    else -> palette.textPrimary
+                },
+                fontFamily = if (isNumeric) VennelaFonts.Mono else VennelaFonts.Sans,
                 fontSize = fontSize,
                 lineHeight = lineHeight,
-                fontWeight = if (negative) FontWeight.Medium else FontWeight.Normal,
+                fontWeight = if (positiveDelta || negativeNumber) FontWeight.SemiBold else FontWeight.Normal,
+                textAlign = if (isNumeric) TextAlign.End else TextAlign.Start,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1432,6 +1581,351 @@ private fun SheetTabRail(
                 onClick = { onSelect(index) },
                 modifier = Modifier.heightIn(min = VennelaTokens.touchTargetMin)
             )
+        }
+    }
+}
+
+/* ------------------------------------------------------------------------- */
+/* Charts mode — real Canvas Bar & Donut analytics from live cells            */
+/* ------------------------------------------------------------------------- */
+
+private data class ChartPoint(val label: String, val value: Double)
+
+@Composable
+private fun SheetChartsSection(
+    sheet: SpreadsheetSheet,
+    numericColumns: List<ColumnStats>,
+    modifier: Modifier = Modifier
+) {
+    val palette = LocalVennelaPalette.current
+    val accent = LocalVennelaAccent.current
+
+    if (numericColumns.isEmpty()) {
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+            GlassPanel(
+                modifier = Modifier.fillMaxWidth().widthIn(max = 600.dp),
+                shape = RoundedCornerShape(VennelaTokens.radiusCardLarge),
+                alpha = 0.38f
+            ) {
+                VennelaEmptyState(
+                    title = "No numeric series for charts",
+                    hint = "Charts plot numeric columns from “${sheet.name}”. Switch to Grid or Rows to inspect text cells.",
+                    icon = Icons.Default.BarChart
+                )
+            }
+        }
+        return
+    }
+
+    var selectedSeriesIdx by remember(sheet.name) { mutableIntStateOf(0) }
+    val activeStats = numericColumns[selectedSeriesIdx.coerceIn(0, numericColumns.lastIndex)]
+    val valueCol = activeStats.column
+
+    val labelCol = remember(sheet, numericColumns) {
+        val numericSet = numericColumns.map { it.column }.toSet()
+        (0 until maxOf(sheet.headers.size, 1)).firstOrNull { col -> col !in numericSet } ?: -1
+    }
+
+    val barPoints = remember(sheet, valueCol, labelCol) {
+        sheet.rows.take(16).mapIndexedNotNull { idx, row ->
+            val raw = row.getOrNull(valueCol)?.value ?: return@mapIndexedNotNull null
+            val num = SpreadsheetParser.cleanNumeric(raw) ?: return@mapIndexedNotNull null
+            val lbl = if (labelCol >= 0) {
+                row.getOrNull(labelCol)?.value?.trim()?.takeIf { it.isNotEmpty() } ?: "Row ${idx + 2}"
+            } else {
+                "Row ${idx + 2}"
+            }
+            ChartPoint(lbl, num)
+        }
+    }
+
+    val donutSlices = remember(sheet, valueCol, labelCol) {
+        val sums = LinkedHashMap<String, Double>()
+        for (idx in 0 until minOf(sheet.rows.size, StatsScanCap)) {
+            val row = sheet.rows[idx]
+            val num = row.getOrNull(valueCol)?.value?.let { SpreadsheetParser.cleanNumeric(it) } ?: continue
+            if (num <= 0.0) continue
+            val cat = if (labelCol >= 0) {
+                row.getOrNull(labelCol)?.value?.trim()?.ifBlank { "Row ${idx + 2}" } ?: "Row ${idx + 2}"
+            } else {
+                "Row ${idx + 2}"
+            }
+            sums[cat] = (sums[cat] ?: 0.0) + num
+        }
+        val sorted = sums.entries.sortedByDescending { it.value }
+        val top = sorted.take(5).map { ChartPoint(it.key, it.value) }
+        val rest = sorted.drop(5).sumOf { it.value }
+        if (rest > 0.0) top + ChartPoint("Other", rest) else top
+    }
+
+    var tappedBarIndex by remember(valueCol, sheet.name) { mutableIntStateOf(-1) }
+    val chartColors = remember(accent) {
+        listOf(accent.secondary, CatViolet, CatEmerald, CatAmber, CatRose, CatBlue)
+    }
+
+    LazyColumn(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(VennelaTokens.spaceMd),
+        contentPadding = PaddingValues(bottom = VennelaTokens.spaceLg)
+    ) {
+        item(key = "chart_series_picker") {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(VennelaTokens.spaceSm)) {
+                items(numericColumns.size, key = { "cseries_${numericColumns[it].column}" }) { idx ->
+                    val col = numericColumns[idx]
+                    LiquidChip(
+                        text = col.header,
+                        icon = Icons.Default.BarChart,
+                        isActive = idx == selectedSeriesIdx,
+                        onClick = { selectedSeriesIdx = idx },
+                        modifier = Modifier.heightIn(min = VennelaTokens.touchTargetCompact)
+                    )
+                }
+            }
+        }
+
+        item(key = "bar_trend_card") {
+            GlassPanel(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(VennelaTokens.radiusCardLarge),
+                alpha = 0.44f,
+                elevation = VennelaTokens.elevationCard
+            ) {
+                Column(Modifier.padding(VennelaTokens.spaceLg)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                text = "${activeStats.header} — Trend",
+                                color = palette.textPrimary,
+                                fontSize = VennelaTokens.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "Tap any bar to inspect • Mean ${formatNumber(activeStats.mean)}",
+                                color = palette.textTertiary,
+                                fontSize = VennelaTokens.micro
+                            )
+                        }
+                        Text(
+                            text = formatNumber(activeStats.sum),
+                            color = accent.secondary,
+                            fontFamily = VennelaFonts.Mono,
+                            fontSize = VennelaTokens.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    val inspected = barPoints.getOrNull(tappedBarIndex)
+                    if (inspected != null) {
+                        Spacer(Modifier.height(VennelaTokens.spaceSm))
+                        val pctTotal = if (activeStats.sum != 0.0) (inspected.value / activeStats.sum * 100.0) else 0.0
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(VennelaTokens.radiusControl))
+                                .background(accent.primary.copy(alpha = 0.20f))
+                                .border(1.dp, accent.secondary.copy(alpha = 0.45f), RoundedCornerShape(VennelaTokens.radiusControl))
+                                .padding(horizontal = VennelaTokens.spaceMd, vertical = VennelaTokens.spaceSm),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = inspected.label,
+                                color = palette.textPrimary,
+                                fontSize = VennelaTokens.caption,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                text = "${formatNumber(inspected.value)} (${String.format(Locale.US, "%.1f%%", pctTotal)})",
+                                color = accent.secondary,
+                                fontFamily = VennelaFonts.Mono,
+                                fontSize = VennelaTokens.caption,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(VennelaTokens.spaceMd))
+
+                    val maxVal = (barPoints.maxOfOrNull { abs(it.value) } ?: 1.0).coerceAtLeast(1e-6)
+                    val gridColor = palette.cardBorder.copy(alpha = 0.35f)
+                    val primaryBar = accent.primary
+                    val secondaryBar = accent.secondary
+
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(170.dp)
+                            .pointerInput(barPoints) {
+                                detectTapGestures { offset ->
+                                    if (barPoints.isEmpty()) return@detectTapGestures
+                                    val slot = size.width.toFloat() / barPoints.size.coerceAtLeast(1)
+                                    val hit = (offset.x / slot).toInt().coerceIn(0, barPoints.lastIndex)
+                                    tappedBarIndex = if (tappedBarIndex == hit) -1 else hit
+                                }
+                            }
+                    ) {
+                        val dash = PathEffect.dashPathEffect(floatArrayOf(8f, 8f), 0f)
+                        for (g in 0..3) {
+                            val y = size.height * (g / 3f)
+                            drawLine(
+                                color = gridColor,
+                                start = Offset(0f, y),
+                                end = Offset(size.width, y),
+                                strokeWidth = 1.dp.toPx(),
+                                pathEffect = dash
+                            )
+                        }
+                        val count = barPoints.size.coerceAtLeast(1)
+                        val slotW = size.width / count
+                        val barW = (slotW * 0.56f).coerceIn(6.dp.toPx(), 28.dp.toPx())
+                        barPoints.forEachIndexed { idx, point ->
+                            val frac = (abs(point.value) / maxVal).toFloat().coerceIn(0.06f, 1f)
+                            val h = size.height * frac * 0.92f
+                            val x = idx * slotW + (slotW - barW) / 2f
+                            val topY = size.height - h
+                            val selected = idx == tappedBarIndex
+                            drawRoundRect(
+                                brush = Brush.verticalGradient(
+                                    colors = if (point.value < 0) {
+                                        listOf(errorCoral, errorCoral.copy(alpha = 0.55f))
+                                    } else if (selected) {
+                                        listOf(CatCyan, primaryBar)
+                                    } else {
+                                        listOf(secondaryBar, primaryBar.copy(alpha = 0.65f))
+                                    },
+                                    startY = topY,
+                                    endY = size.height
+                                ),
+                                topLeft = Offset(x, topY),
+                                size = Size(barW, h),
+                                cornerRadius = CornerRadius(6.dp.toPx(), 6.dp.toPx())
+                            )
+                        }
+                    }
+
+                    if (barPoints.isNotEmpty()) {
+                        Spacer(Modifier.height(VennelaTokens.spaceXs))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            val step = (barPoints.size / 4).coerceAtLeast(1)
+                            barPoints.filterIndexed { i, _ -> i % step == 0 || i == barPoints.lastIndex }
+                                .take(5)
+                                .forEach { pt ->
+                                    Text(
+                                        text = pt.label.take(10),
+                                        color = palette.textTertiary,
+                                        fontSize = VennelaTokens.nano,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (donutSlices.isNotEmpty()) {
+            item(key = "donut_breakdown_card") {
+                val positiveTotal = donutSlices.sumOf { it.value }.coerceAtLeast(1e-6)
+                GlassPanel(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(VennelaTokens.radiusCardLarge),
+                    alpha = 0.44f,
+                    elevation = VennelaTokens.elevationCard
+                ) {
+                    Column(Modifier.padding(VennelaTokens.spaceLg)) {
+                        Text(
+                            text = "${activeStats.header} — Share Breakdown",
+                            color = palette.textPrimary,
+                            fontSize = VennelaTokens.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(VennelaTokens.spaceMd))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(VennelaTokens.spaceLg)
+                        ) {
+                            Box(
+                                modifier = Modifier.size(132.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Canvas(Modifier.fillMaxSize().padding(8.dp)) {
+                                    var startAngle = -90f
+                                    val strokeWidth = 18.dp.toPx()
+                                    donutSlices.forEachIndexed { idx, slice ->
+                                        val sweep = ((slice.value / positiveTotal) * 360.0).toFloat()
+                                        val gap = if (donutSlices.size > 1) 4f else 0f
+                                        drawArc(
+                                            color = chartColors[idx % chartColors.size],
+                                            startAngle = startAngle + gap / 2f,
+                                            sweepAngle = (sweep - gap).coerceAtLeast(1f),
+                                            useCenter = false,
+                                            style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                                        )
+                                        startAngle += sweep
+                                    }
+                                }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = "${donutSlices.size}",
+                                        color = palette.textPrimary,
+                                        fontFamily = VennelaFonts.Mono,
+                                        fontSize = VennelaTokens.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "groups",
+                                        color = palette.textTertiary,
+                                        fontSize = VennelaTokens.nano
+                                    )
+                                }
+                            }
+
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(VennelaTokens.spaceXs)
+                            ) {
+                                donutSlices.forEachIndexed { idx, slice ->
+                                    val color = chartColors[idx % chartColors.size]
+                                    val pct = slice.value / positiveTotal * 100.0
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            Modifier.size(8.dp)
+                                                .clip(CircleShape)
+                                                .background(color)
+                                        )
+                                        Spacer(Modifier.width(VennelaTokens.spaceXs))
+                                        Text(
+                                            text = slice.label,
+                                            color = palette.textPrimary,
+                                            fontSize = VennelaTokens.micro,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Spacer(Modifier.width(VennelaTokens.spaceXs))
+                                        Text(
+                                            text = String.format(Locale.US, "%.0f%%", pct),
+                                            color = palette.textSecondary,
+                                            fontFamily = VennelaFonts.Mono,
+                                            fontSize = VennelaTokens.micro,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -1797,17 +2291,22 @@ private fun SheetToolDock(
     mode: SheetMode,
     findOpen: Boolean,
     onShare: () -> Unit,
-    onOpenWith: () -> Unit,
+    onExportCsv: () -> Unit,
     onFind: () -> Unit,
     onModeChange: (SheetMode) -> Unit,
     onMore: () -> Unit
 ) {
-    // A compact floating pill: six icon actions, no labels, so the grid keeps
+    // A compact floating pill: seven icon actions, no labels, so the grid keeps
     // almost the whole screen.
     ReaderBottomPill {
         SheetDockAction(Icons.Default.Share, "Share sheet", false, onShare)
-        SheetDockAction(Icons.AutoMirrored.Filled.OpenInNew, "Open with another app", false, onOpenWith)
+        SheetDockAction(Icons.Default.SaveAlt, "Export CSV", false, onExportCsv)
         SheetDockAction(Icons.AutoMirrored.Filled.ManageSearch, "Find in sheet", findOpen, onFind)
+        SheetDockAction(
+            Icons.Default.BarChart,
+            "Charts",
+            mode == SheetMode.CHART
+        ) { onModeChange(SheetMode.CHART) }
         SheetDockAction(
             Icons.Default.Calculate,
             "Statistics",

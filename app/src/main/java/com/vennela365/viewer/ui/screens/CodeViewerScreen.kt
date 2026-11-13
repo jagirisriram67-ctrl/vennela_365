@@ -79,9 +79,9 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -95,6 +95,7 @@ import com.vennela365.viewer.rendering.ViewerState
 import com.vennela365.viewer.storage.ShareUri
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.ViewerColorMode
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.theme.applyViewerColorMode
@@ -608,6 +609,7 @@ fun CodeViewerScreen(viewModel: MainViewModel) {
                         icon = Icons.AutoMirrored.Filled.WrapText,
                         contentDescription = if (isWrapped) "Wrapping on" else "Wrapping off",
                         active = isWrapped,
+                        modifier = Modifier.testTag("code_wrap_button"),
                         onClick = {
                             isWrapped = !isWrapped
                             chromeVisible = true
@@ -616,6 +618,7 @@ fun CodeViewerScreen(viewModel: MainViewModel) {
                     ReaderIconButton(
                         icon = Icons.Default.TextDecrease,
                         contentDescription = "Smaller code",
+                        modifier = Modifier.testTag("code_font_dec_button"),
                         onClick = {
                             fontSizeSp = (fontSizeSp - CodeFontStep).coerceAtLeast(CodeFontMin)
                             chromeVisible = true
@@ -624,6 +627,7 @@ fun CodeViewerScreen(viewModel: MainViewModel) {
                     ReaderIconButton(
                         icon = Icons.Default.TextIncrease,
                         contentDescription = "Larger code",
+                        modifier = Modifier.testTag("code_font_inc_button"),
                         onClick = {
                             fontSizeSp = (fontSizeSp + CodeFontStep).coerceAtMost(CodeFontMax)
                             chromeVisible = true
@@ -633,17 +637,20 @@ fun CodeViewerScreen(viewModel: MainViewModel) {
                         icon = Icons.Default.Search,
                         contentDescription = "Find in file",
                         active = showFind,
+                        modifier = Modifier.testTag("code_find_button"),
                         onClick = { toggleFind() }
                     )
                     ReaderIconButton(
                         icon = Icons.Default.LowPriority,
                         contentDescription = "Jump to line",
                         active = showJump,
+                        modifier = Modifier.testTag("code_jump_button"),
                         onClick = { toggleJump() }
                     )
                     ReaderIconButton(
                         icon = Icons.Default.ContentCopy,
                         contentDescription = "Copy all code",
+                        modifier = Modifier.testTag("code_copy_button"),
                         onClick = { copyAll() }
                     )
                 }
@@ -829,74 +836,80 @@ private fun CodeReadingSurface(
         )
     }
 
-    LazyColumn(
-        state = listState,
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(pageBrush)
-            .padding(horizontal = VennelaTokens.gutter),
-        // The chrome floats above the page, so the page itself reserves no
-        // band: the first row clears the bar, and the last row clears the pill.
-        contentPadding = PaddingValues(
-            start = VennelaTokens.spaceXs,
-            end = VennelaTokens.spaceSm,
-            top = topInset + VennelaTokens.spaceXs,
-            bottom = VennelaTokens.spaceHuge + VennelaTokens.spaceXl
-        )
+            .background(pageBrush),
+        contentAlignment = Alignment.TopCenter
     ) {
-        items(count = rowCount, key = { index -> index }) { index ->
-            val isActive = index == activeMatchLine
-            val isHit = matchLines.contains(index)
-            val source = lines[index]
-            val rowText = if (source.length > MaxCharsPerLine) {
-                source.take(MaxCharsPerLine)
-            } else {
-                source
-            }
-            val rowScroll = rememberScrollState()
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .widthIn(max = 980.dp)
+                .fillMaxSize()
+                .padding(horizontal = VennelaTokens.gutter),
+            // The chrome floats above the page, so the page itself reserves no
+            // band: the first row clears the bar, and the last row clears the pill.
+            contentPadding = PaddingValues(
+                start = VennelaTokens.spaceXs,
+                end = VennelaTokens.spaceSm,
+                top = topInset + VennelaTokens.spaceXs,
+                bottom = VennelaTokens.spaceHuge + VennelaTokens.spaceXl
+            )
+        ) {
+            items(count = rowCount, key = { index -> index }) { index ->
+                val isActive = index == activeMatchLine
+                val isHit = matchLines.contains(index)
+                val source = lines[index]
+                val rowText = if (source.length > MaxCharsPerLine) {
+                    source.take(MaxCharsPerLine)
+                } else {
+                    source
+                }
+                val rowScroll = rememberScrollState()
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .then(
-                        if (isActive) {
-                            Modifier.background(
-                                accent.primary.copy(alpha = 0.20f),
-                                RoundedCornerShape(VennelaTokens.radiusChip)
-                            )
-                        } else {
-                            Modifier
-                        }
-                    )
-                    .padding(vertical = VennelaTokens.spaceXxs),
-                verticalAlignment = Alignment.Top
-            ) {
-                Text(
-                    text = "${index + 1}",
-                    color = when {
-                        isActive -> accent.secondary
-                        isHit -> accent.primary
-                        else -> palette.textTertiary
-                    },
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = VennelaTokens.micro,
-                    fontWeight = if (isHit) FontWeight.Bold else FontWeight.Normal,
-                    lineHeight = lineHeight,
-                    maxLines = 1,
-                    softWrap = false,
+                Row(
                     modifier = Modifier
-                        .width(GutterWidth)
-                        .heightIn(min = lineHeightDp)
-                        .padding(end = VennelaTokens.spaceSm)
-                )
+                        .fillMaxWidth()
+                        .then(
+                            if (isActive) {
+                                Modifier.background(
+                                    accent.primary.copy(alpha = 0.20f),
+                                    RoundedCornerShape(VennelaTokens.radiusChip)
+                                )
+                            } else {
+                                Modifier
+                            }
+                        )
+                        .padding(vertical = VennelaTokens.spaceXxs),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Text(
+                        text = "${index + 1}",
+                        color = when {
+                            isActive -> accent.secondary
+                            isHit -> accent.primary
+                            else -> palette.textTertiary
+                        },
+                        fontFamily = VennelaFonts.Mono,
+                        fontSize = VennelaTokens.micro,
+                        fontWeight = if (isHit) FontWeight.Bold else FontWeight.Normal,
+                        lineHeight = lineHeight,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier
+                            .width(GutterWidth)
+                            .heightIn(min = lineHeightDp)
+                            .padding(end = VennelaTokens.spaceSm)
+                    )
 
-                Text(
-                    text = highlighted.getOrNull(index) ?: AnnotatedString(rowText),
-                    color = palette.textPrimary,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = fontSizeSp.sp,
-                    lineHeight = lineHeight,
-                    softWrap = isWrapped,
+                    Text(
+                        text = highlighted.getOrNull(index) ?: AnnotatedString(rowText),
+                        color = palette.textPrimary,
+                        fontFamily = VennelaFonts.Mono,
+                        fontSize = fontSizeSp.sp,
+                        lineHeight = lineHeight,
+                        softWrap = isWrapped,
                     // A wrapped 2,000-character minified line would otherwise
                     // lay out as dozens of screens and stall the frame.
                     maxLines = if (isWrapped) 120 else 1,
@@ -930,6 +943,7 @@ private fun CodeReadingSurface(
                 )
             }
         }
+    }
     }
 }
 

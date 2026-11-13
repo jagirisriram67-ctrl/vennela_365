@@ -1,9 +1,9 @@
 package com.vennela365.viewer.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -14,22 +14,26 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -38,6 +42,7 @@ import com.vennela365.viewer.model.HexRow
 import com.vennela365.viewer.parser.FileParserManager
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.ui.components.LiquidPage
 import com.vennela365.viewer.viewmodel.MainViewModel
@@ -66,6 +71,7 @@ fun BinaryInspectorScreen(
     subtitle: String
 ) {
     val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
     val file by viewModel.selectedFile.collectAsState()
@@ -96,6 +102,7 @@ fun BinaryInspectorScreen(
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
             contentPadding = PaddingValues(
                 start = VennelaTokens.gutter,
                 end = VennelaTokens.gutter,
@@ -107,6 +114,7 @@ fun BinaryInspectorScreen(
             item(key = "file") {
                 Column(
                     Modifier
+                        .widthIn(max = 840.dp)
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(VennelaTokens.radiusCard))
                         .background(palette.cardSurfaceStrong)
@@ -130,13 +138,40 @@ fun BinaryInspectorScreen(
                     InspectRow("Extension", (file?.extension?.uppercase() ?: "—"))
                     InspectRow("Size", file?.formattedSize ?: "—")
                     InspectRow("Modified", file?.formattedDate ?: "—")
-                    InspectRow("SHA-256", inspection?.checksum ?: "Computing…")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            InspectRow("SHA-256", inspection?.checksum ?: "Computing…")
+                        }
+                        val readyHash = inspection?.checksum?.takeIf { it.isNotBlank() && it != "—" && it != "N/A" }
+                        if (readyHash != null) {
+                            IconButton(
+                                onClick = {
+                                    clipboard.setText(AnnotatedString(readyHash))
+                                    Toast.makeText(context, "SHA-256 copied", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier
+                                    .size(VennelaTokens.touchTargetMin)
+                                    .testTag("binary_copy_hash_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "Copy SHA-256 checksum",
+                                    tint = accent.secondary,
+                                    modifier = Modifier.size(VennelaTokens.iconSm)
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
             item(key = "safety") {
                 Row(
                     Modifier
+                        .widthIn(max = 840.dp)
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(VennelaTokens.radiusCard))
                         .background(accent.primary.copy(alpha = 0.12f))
@@ -167,6 +202,7 @@ fun BinaryInspectorScreen(
             item(key = "hex") {
                 Column(
                     Modifier
+                        .widthIn(max = 840.dp)
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(VennelaTokens.radiusCard))
                         .background(palette.cardSurface.copy(alpha = 0.55f))
@@ -181,7 +217,8 @@ fun BinaryInspectorScreen(
                         text = "Hex preview • first 4 KB",
                         color = palette.textSecondary,
                         fontSize = VennelaTokens.nano,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = VennelaFonts.Mono
                     )
                     Spacer(Modifier.height(VennelaTokens.spaceXs))
                     val rows = inspection?.hex.orEmpty()
@@ -198,7 +235,7 @@ fun BinaryInspectorScreen(
                                 color = palette.textPrimary,
                                 fontSize = 9.5.sp,
                                 lineHeight = 14.sp,
-                                fontFamily = FontFamily.Monospace,
+                                fontFamily = VennelaFonts.Mono,
                                 maxLines = 1,
                                 overflow = TextOverflow.Clip
                             )
@@ -230,7 +267,7 @@ private fun InspectRow(label: String, value: String) {
             fontSize = VennelaTokens.micro,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
-            fontFamily = if (label == "SHA-256") FontFamily.Monospace else FontFamily.SansSerif
+            fontFamily = if (label == "SHA-256") VennelaFonts.Mono else VennelaFonts.Sans
         )
     }
 }

@@ -73,11 +73,11 @@ fun VennelaBackground(
 
     LiquidBackdrop(
         modifier = modifier,
+        cacheKey = quality,
         render = { size ->
             LiquidAtmosphere.render(
                 canvas = nativeCanvas,
                 width = size.width,
-
                 height = size.height,
                 palette = palette,
                 accent = accent,
@@ -236,65 +236,134 @@ fun FileBrandBadge(
     modifier: Modifier = Modifier,
     size: Dp = 44.dp
 ) {
-    val ext = extension.lowercase()
-    val (bgColor, iconVector, badgeText) = when (ext) {
-        "pdf" -> Triple(Color(0xFFFF5470), Icons.Default.PictureAsPdf, "PDF")
-        "doc", "docx" -> Triple(Color(0xFF4C8DFF), Icons.Default.Description, "W")
-        "xls", "xlsx", "csv" -> Triple(Color(0xFF19D89B), Icons.Default.TableChart, "X")
-        "ppt", "pptx" -> Triple(Color(0xFFFF9A3D), Icons.Default.Slideshow, "P")
-        "jpg", "jpeg", "png", "webp", "gif" -> Triple(Color(0xFF1FC9B4), Icons.Default.Image, null)
-        "mp3", "wav", "flac", "aac" -> Triple(Color(0xFFFF4D9E), Icons.Default.MusicNote, null)
-        "mp4", "mkv", "mov", "avi" -> Triple(Color(0xFFA06BFF), Icons.Default.PlayArrow, null)
-        "zip", "rar", "7z", "tar" -> Triple(Color(0xFFFFBE3D), Icons.Default.FolderZip, null)
-        "py" -> Triple(Color(0xFF52A0FF), Icons.Default.Code, "PY")
-        "java", "kt", "js", "ts", "html", "css" -> Triple(Color(0xFF7C86FF), Icons.Default.Code, "</>")
-        "md", "markdown" -> Triple(Color(0xFF6E6BFF), Icons.Default.AutoStories, "M↓")
-        "mmd", "mermaid" -> Triple(Color(0xFFBE7CFF), Icons.Default.AccountTree, null)
-        else -> Triple(Color(0xFF7A8BB5), Icons.AutoMirrored.Filled.InsertDriveFile, ext.take(3).uppercase())
+    val ext = extension.lowercase().trim()
+    val (startColor, endColor, iconVector) = when (ext) {
+        "pdf", "xps", "oxps" -> Triple(Color(0xFFFF4B6E), Color(0xFFD92B4B), Icons.Default.PictureAsPdf)
+        "doc", "docx", "docm", "dotx", "odt", "rtf", "pages", "tex" ->
+            Triple(Color(0xFF3B82F6), Color(0xFF1D4ED8), Icons.Default.Description)
+        "xls", "xlsx", "xlsm", "ods", "csv", "tsv", "numbers", "parquet" ->
+            Triple(Color(0xFF10B981), Color(0xFF047857), Icons.Default.TableChart)
+        "ppt", "pptx", "pptm", "ppsx", "odp", "key" ->
+            Triple(Color(0xFFF97316), Color(0xFFC2410C), Icons.Default.Slideshow)
+        "epub", "fb2", "mobi", "azw3", "cbz", "cbr", "djvu" ->
+            Triple(Color(0xFF06B6D4), Color(0xFF0E7490), Icons.AutoMirrored.Filled.MenuBook)
+        "ipynb", "qmd", "rmd" ->
+            Triple(Color(0xFFF59E0B), Color(0xFFB45309), Icons.Default.Science)
+        "jpg", "jpeg", "png", "webp", "gif", "apng", "heic", "heif", "avif", "svg", "svgz", "ico" ->
+            Triple(Color(0xFF14B8A6), Color(0xFF0F766E), Icons.Default.Image)
+        "mp3", "wav", "flac", "aac", "ogg", "m4a", "opus", "lrc" ->
+            Triple(Color(0xFFEC4899), Color(0xFFBE185D), Icons.Default.MusicNote)
+        "mp4", "mkv", "mov", "avi", "webm", "srt", "vtt", "ass", "ssa" ->
+            Triple(Color(0xFF8B5CF6), Color(0xFF5B21B6), Icons.Default.PlayArrow)
+        "zip", "rar", "7z", "tar", "gz", "bz2", "xz", "zst", "apk", "aab", "jar" ->
+            Triple(Color(0xFFF59E0B), Color(0xFFD97706), Icons.Default.FolderZip)
+        "json", "jsonl", "ndjson", "yaml", "yml", "toml", "ini", "xml", "plist" ->
+            Triple(Color(0xFF0EA5E9), Color(0xFF0369A1), Icons.Default.DataObject)
+        "py", "kt", "kts", "java", "js", "ts", "tsx", "jsx", "c", "cpp", "rs", "go", "swift", "rb", "php", "sh", "html", "css" ->
+            Triple(Color(0xFF6366F1), Color(0xFF4338CA), Icons.Default.Code)
+        "md", "markdown", "rst", "adoc", "org" ->
+            Triple(Color(0xFF7C3AED), Color(0xFF4C1D95), Icons.Default.AutoStories)
+        "mmd", "mermaid", "puml", "plantuml", "dot", "gv", "bpmn" ->
+            Triple(Color(0xFFA855F7), Color(0xFF6B21A8), Icons.Default.AccountTree)
+        "obj", "stl", "ply", "dxf", "gltf", "glb" ->
+            Triple(Color(0xFF10B981), Color(0xFF065F46), Icons.Default.ViewInAr)
+        "geojson", "gpx", "kml", "tcx" ->
+            Triple(Color(0xFF22C55E), Color(0xFF15803D), Icons.Default.Map)
+        "db", "sqlite", "sqlite3", "sql" ->
+            Triple(Color(0xFF38BDF8), Color(0xFF0284C7), Icons.Default.Storage)
+        "eml", "msg", "vcf", "ics" ->
+            Triple(Color(0xFF60A5FA), Color(0xFF2563EB), Icons.Default.Mail)
+        else -> Triple(Color(0xFF64748B), Color(0xFF334155), Icons.AutoMirrored.Filled.InsertDriveFile)
     }
+
+    val tagText = remember(ext) {
+        ext.uppercase().take(4).ifBlank { "FILE" }
+    }
+    val cornerRadius = (size.value * 0.28f).coerceIn(8f, 16f).dp
+    val shape = RoundedCornerShape(cornerRadius)
+    val showMicroTag = size >= 38.dp
 
     Box(
         modifier = modifier
             .size(size)
             .shadow(
-                elevation = 10.dp,
-                shape = RoundedCornerShape(VennelaTokens.radiusBadge),
+                elevation = 6.dp,
+                shape = shape,
                 clip = false,
-                ambientColor = bgColor.copy(alpha = 0.60f),
-                spotColor = bgColor.copy(alpha = 0.60f)
+                ambientColor = startColor.copy(alpha = 0.36f),
+                spotColor = endColor.copy(alpha = 0.36f)
             )
-            .clip(RoundedCornerShape(VennelaTokens.radiusBadge))
+            .clip(shape)
             .background(
                 Brush.linearGradient(
-                    listOf(
-                        bgColor.copy(alpha = 1f),
-                        bgColor.copy(alpha = 0.86f),
-                        bgColor.copy(alpha = 0.70f)
-                    )
+                    colors = listOf(startColor, endColor)
                 )
             )
             .border(
-                1.dp,
-                Brush.verticalGradient(
-                    listOf(Color.White.copy(alpha = 0.55f), Color.White.copy(alpha = 0.08f))
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    listOf(
+                        Color.White.copy(alpha = 0.56f),
+                        Color.White.copy(alpha = 0.12f)
+                    )
                 ),
-                RoundedCornerShape(VennelaTokens.radiusBadge)
+                shape = shape
             ),
         contentAlignment = Alignment.Center
     ) {
-        if (badgeText != null && badgeText.length <= 3) {
-            Text(
-                text = badgeText,
-                color = Color.White,
-                fontSize = if (badgeText.length <= 2) 16.sp else 12.sp,
-                fontWeight = FontWeight.ExtraBold
-            )
+        // Subtle top-half glass lens reflection
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.45f)
+                .align(Alignment.TopCenter)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.White.copy(alpha = 0.24f),
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
+
+        if (showMicroTag) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.padding(vertical = 2.dp)
+            ) {
+                Icon(
+                    imageVector = iconVector,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size((size.value * 0.42f).dp)
+                )
+                Spacer(modifier = Modifier.height(1.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color.Black.copy(alpha = 0.24f))
+                        .padding(horizontal = 4.dp, vertical = 0.5.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = tagText,
+                        color = Color.White.copy(alpha = 0.96f),
+                        fontFamily = VennelaFonts.Mono,
+                        fontSize = 7.5.sp,
+                        lineHeight = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                }
+            }
         } else {
             Icon(
                 imageVector = iconVector,
                 contentDescription = null,
                 tint = Color.White,
-                modifier = Modifier.size((size.value * 0.55f).dp)
+                modifier = Modifier.size((size.value * 0.52f).dp)
             )
         }
     }
@@ -315,9 +384,6 @@ fun VennelaAppBar(
 
 /**
  * A circular icon button.
- *
- * A thin alias over the app's single [ReaderIconButton], so it no longer
- * reserves a 48dp square that inflated the bars it sat in.
  */
 @Composable
 fun VennelaIconButton(
@@ -345,52 +411,52 @@ fun VennelaSearchField(
 ) {
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
+    val shape = RoundedCornerShape(VennelaTokens.radiusPill)
+    val spec = liquidGlassSpec(
+        alpha = if (palette.isDark) 0.62f else 0.86f,
+        frost = VennelaTokens.frostRegular,
+        elevation = VennelaTokens.elevationCard,
+        sheen = 0.22f,
+        highlight = 0.18f
+    )
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .shadow(
-                elevation = 14.dp,
-                shape = RoundedCornerShape(VennelaTokens.radiusPill),
-                clip = false,
-                ambientColor = accent.primary.copy(alpha = 0.45f),
-                spotColor = accent.secondary.copy(alpha = 0.45f)
-            )
-            .clip(RoundedCornerShape(VennelaTokens.radiusPill))
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        palette.cardSurfaceStrong.copy(alpha = 0.86f),
-                        palette.cardSurface.copy(alpha = 0.70f)
-                    )
-                )
-            )
-            .border(
-                1.dp,
-                Brush.horizontalGradient(
-                    listOf(
-                        accent.secondary.copy(alpha = 0.55f),
-                        Color.White.copy(alpha = 0.22f),
-                        accent.primary.copy(alpha = 0.45f)
-                    )
-                ),
-                RoundedCornerShape(VennelaTokens.radiusPill)
-            )
-            .padding(horizontal = 14.dp, vertical = 3.dp),
+            .heightIn(min = 48.dp)
+            .liquidGlass(spec, shape)
+            .padding(start = 16.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(Icons.Default.Search, contentDescription = "Search", tint = accent.secondary, modifier = Modifier.size(VennelaTokens.iconMd))
-        Spacer(modifier = Modifier.width(VennelaTokens.spaceSm))
+        Icon(
+            Icons.Default.Search,
+            contentDescription = "Search",
+            tint = accent.secondary,
+            modifier = Modifier.size(19.dp)
+        )
+        Spacer(modifier = Modifier.width(10.dp))
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
             singleLine = true,
-            textStyle = TextStyle(color = palette.textPrimary, fontSize = VennelaTokens.bodySmall),
+            textStyle = TextStyle(
+                color = palette.textPrimary,
+                fontFamily = VennelaFonts.Sans,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium
+            ),
             cursorBrush = SolidColor(accent.secondary),
             modifier = Modifier
                 .weight(1f)
-                .padding(vertical = 10.dp),
+                .padding(vertical = 8.dp),
             decorationBox = { inner ->
-                if (value.isEmpty()) Text(placeholder, color = palette.textTertiary, fontSize = VennelaTokens.bodySmall)
+                if (value.isEmpty()) {
+                    Text(
+                        placeholder,
+                        color = palette.textSecondary.copy(alpha = 0.78f),
+                        fontFamily = VennelaFonts.Sans,
+                        fontSize = 14.sp
+                    )
+                }
                 inner()
             }
         )
@@ -584,60 +650,86 @@ fun VennelaSegmentedControl(
 ) {
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
+    val trackShape = RoundedCornerShape(VennelaTokens.radiusPill)
+    val pillShape = RoundedCornerShape(VennelaTokens.radiusPill)
+    val spec = liquidGlassSpec(
+        alpha = if (palette.isDark) 0.56f else 0.82f,
+        frost = VennelaTokens.frostRegular,
+        elevation = VennelaTokens.elevationRaised,
+        sheen = 0.20f,
+        highlight = 0.16f
+    )
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .shadow(
-                elevation = 10.dp,
-                shape = RoundedCornerShape(VennelaTokens.radiusCardLarge),
-                clip = false,
-                ambientColor = accent.primary.copy(alpha = 0.35f),
-                spotColor = accent.secondary.copy(alpha = 0.35f)
-            )
-            .clip(RoundedCornerShape(VennelaTokens.radiusCardLarge))
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        palette.cardSurfaceStrong.copy(alpha = 0.80f),
-                        palette.cardSurface.copy(alpha = 0.62f)
-                    )
-                )
-            )
-            .border(1.dp, palette.cardBorder, RoundedCornerShape(VennelaTokens.radiusCardLarge))
+            .liquidGlass(spec, trackShape)
             .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         options.forEach { opt ->
             val sel = opt == selected
+            val activeFill = if (palette.isDark) {
+                Brush.verticalGradient(
+                    listOf(
+                        Color.White.copy(alpha = 0.22f),
+                        accent.primary.copy(alpha = 0.44f),
+                        accent.secondary.copy(alpha = 0.28f)
+                    )
+                )
+            } else {
+                Brush.verticalGradient(
+                    listOf(
+                        Color.White.copy(alpha = 0.96f),
+                        accent.primary.copy(alpha = 0.20f)
+                    )
+                )
+            }
+            val activeRim = Brush.verticalGradient(
+                listOf(
+                    Color.White.copy(alpha = if (palette.isDark) 0.56f else 0.94f),
+                    accent.secondary.copy(alpha = 0.44f)
+                )
+            )
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(VennelaTokens.radiusControl))
+                    .heightIn(min = 36.dp)
+                    .clip(pillShape)
                     .then(
                         if (sel) {
                             Modifier
                                 .shadow(
-                                    elevation = 10.dp,
-                                    shape = RoundedCornerShape(VennelaTokens.radiusControl),
+                                    elevation = 6.dp,
+                                    shape = pillShape,
                                     clip = false,
-                                    ambientColor = accent.primary.copy(alpha = 0.65f),
-                                    spotColor = accent.secondary.copy(alpha = 0.65f)
+                                    ambientColor = accent.primary.copy(alpha = 0.32f),
+                                    spotColor = accent.secondary.copy(alpha = 0.32f)
                                 )
-                                .background(Brush.horizontalGradient(listOf(accent.primary, accent.secondary)))
-                                .border(
-                                    1.dp,
-                                    Color.White.copy(alpha = 0.30f),
-                                    RoundedCornerShape(VennelaTokens.radiusControl)
-                                )
+                                .background(activeFill)
+                                .border(1.dp, activeRim, pillShape)
                         } else {
                             Modifier
                         }
                     )
                     .pressScale(pressedScale = 0.95f) { onSelect(opt) }
-                    .padding(vertical = 9.dp),
+                    .padding(horizontal = 8.dp, vertical = 7.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(opt, color = if (sel) Color.White else palette.textSecondary, fontSize = 13.sp, fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    text = opt,
+                    color = when {
+                        sel && palette.isDark -> Color.White
+                        sel -> accent.primary
+                        else -> palette.textSecondary
+                    },
+                    fontFamily = VennelaFonts.Sans,
+                    fontSize = 12.5.sp,
+                    lineHeight = 15.sp,
+                    fontWeight = if (sel) FontWeight.Bold else FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }

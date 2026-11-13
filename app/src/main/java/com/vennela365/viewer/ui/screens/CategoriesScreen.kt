@@ -59,6 +59,10 @@ import com.vennela365.viewer.theme.CatSlate
 import com.vennela365.viewer.theme.LiquidMotion
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.platform.testTag
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.ui.components.FileBrandBadge
 import com.vennela365.viewer.ui.components.FloatingDockNav
@@ -156,14 +160,21 @@ fun CategoriesScreen(viewModel: MainViewModel) {
             LiquidIconButton(
                 icon = Icons.Default.Search,
                 contentDescription = "Search files",
+                modifier = Modifier.testTag("categories_search_button"),
                 onClick = { viewModel.navigateTo(Screen.UniversalSearch) }
             )
         }
     ) { pagePadding ->
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.TopCenter
+        ) {
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 150.dp),
+            columns = GridCells.Adaptive(minSize = 156.dp),
             state = categoriesGridState,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = 960.dp),
             contentPadding = PaddingValues(
                 start = VennelaTokens.gutter,
                 end = VennelaTokens.gutter,
@@ -191,6 +202,7 @@ fun CategoriesScreen(viewModel: MainViewModel) {
                         text = "All categories",
                         icon = Icons.Default.Category,
                         isActive = true,
+                        modifier = Modifier.testTag("categories_all_chip"),
                         onClick = { viewModel.setCategory(null) }
                     )
                 }
@@ -331,6 +343,7 @@ fun CategoriesScreen(viewModel: MainViewModel) {
                 )
             }
         }
+        }
     }
 }
 
@@ -469,6 +482,7 @@ private fun CategoryTile(
     val tileShape = RoundedCornerShape(VennelaTokens.radiusCard)
     GlassPanel(
         modifier = Modifier
+            .testTag("category_tile_${tile.category.name.lowercase()}")
             .fillMaxWidth()
             .shadow(
                 elevation = 16.dp,
@@ -616,8 +630,9 @@ private fun FormatCatalogRow(
                 )
                 Spacer(modifier = Modifier.height(VennelaTokens.spaceXxs))
                 Text(
-                    text = ".${format.extension} • ${format.defaultRenderer} • ${format.supportLevel.label}",
+                    text = ".${format.extension} · ${format.defaultRenderer} · ${format.supportLevel.label}",
                     color = palette.textSecondary,
+                    fontFamily = VennelaFonts.Mono,
                     fontSize = VennelaTokens.micro,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -664,6 +679,7 @@ private fun SupportLevelPill(level: SupportLevel) {
         Text(
             text = "L${level.level}",
             color = tint,
+            fontFamily = VennelaFonts.Mono,
             fontSize = VennelaTokens.micro,
             fontWeight = FontWeight.ExtraBold
         )

@@ -1,236 +1,283 @@
 package com.vennela365.viewer.theme
 
-import android.graphics.Paint
+import android.os.Build
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import kotlin.math.roundToInt
 
 /**
- * Every dial that shapes a liquid-glass surface.
+ * Apple iOS 26 / visionOS Liquid Glass specification.
  *
- * Origin-OS style glass is not one effect: it is a frosted backdrop, a tinted
- * body, a bright specular rim, an interior sheen and a soft drop shadow stacked
- * in that order. This spec keeps all five tunable per surface.
+ * Models optical refraction, dual-stop translucent lens fill, diagonal
+ * specular rim lighting, and inner top/bottom caustic reflections.
  */
+@Immutable
 data class LiquidGlassSpec(
-    /** Tint washed over the frosted backdrop. */
     val tint: Color,
-    /** Secondary tint for the vertical body gradient. */
     val tintEnd: Color = tint,
-    /** Frost strength in dp. 0 disables blur entirely. */
-    val frost: Dp = 18.dp,
-    /** Opacity of the frosted backdrop showing through the tint. */
-    val backdropAlpha: Float = 0.58f,
-    /** Rim colour, brightest at the top edge. */
-    val rim: Color,
-    /** Rim thickness. */
+    val frost: Dp = VennelaTokens.frostRegular,
+    val backdropAlpha: Float = 0.60f,
+    val rim: Color = Color.White.copy(alpha = 0.24f),
     val rimWidth: Dp = 1.dp,
-    /** Interior sheen strength, 0..1. */
-    val sheen: Float = 0.18f,
-    /** Drop shadow elevation. */
-    val elevation: Dp = 10.dp,
-    /** Shadow colour; the accent glow reads best at low alpha. */
-    val shadowColor: Color = Color(0x66000000),
-    /** Liquid highlight blob strength, 0 disables it. */
-    val highlight: Float = 0.14f
+    val sheen: Float = 0.20f,
+    val elevation: Dp = VennelaTokens.elevationCard,
+    val shadowColor: Color = Color(0x55000000),
+    val highlight: Float = 0.16f
 )
 
 /**
- * Applies a real liquid-glass surface.
- *
- * The backdrop directly behind this element is sampled, down-scaled and blurred
- * so the result reads as frosted glass rather than a flat translucent
- * rectangle. When the backdrop is unavailable — or the device is in the
- * low-power fidelity tier — the same call degrades to a tinted, rimmed surface
- * at near-zero cost, so callers never need to branch.
+ * Builds a [LiquidGlassSpec] tuned to the active [VennelaPalette] and
+ * [AccentOption] with authentic Apple Liquid Glass optical defaults.
  */
 @Composable
+fun liquidGlassSpec(
+    alpha: Float = 0.56f,
+    frost: Dp = VennelaTokens.frostRegular,
+    elevation: Dp = VennelaTokens.elevationCard,
+    sheen: Float = 0.20f,
+    highlight: Float = 0.16f,
+    strong: Boolean = false,
+    accentRim: Boolean = false
+): LiquidGlassSpec {
+    val palette = LocalVennelaPalette.current
+    val accent = LocalVennelaAccent.current
+    val baseAlpha = if (strong) (alpha + 0.14f) else alpha
+    val resolvedAlpha = if (palette.isDark) {
+        baseAlpha.coerceIn(0.18f, 0.90f)
+    } else {
+        (baseAlpha + 0.42f).coerceIn(0.82f, 0.97f)
+    }
+    val startSurface = if (palette.isDark) {
+        Color(
+            red = (palette.cardSurfaceStrong.red * 0.88f + 0.12f).coerceIn(0f, 1f),
+            green = (palette.cardSurfaceStrong.green * 0.88f + 0.12f).coerceIn(0f, 1f),
+            blue = (palette.cardSurfaceStrong.blue * 0.88f + 0.12f).coerceIn(0f, 1f),
+            alpha = resolvedAlpha
+        )
+    } else {
+        Color.White.copy(alpha = resolvedAlpha)
+    }
+    val endSurface = if (palette.isDark) {
+        palette.cardSurface.copy(
+            alpha = (resolvedAlpha * 0.82f).coerceIn(0.14f, 0.90f)
+        )
+    } else {
+        palette.cardSurfaceStrong.copy(
+            alpha = (resolvedAlpha * 0.95f).coerceIn(0.80f, 0.96f)
+        )
+    }
+    val rimColor = when {
+        accentRim -> accent.secondary.copy(alpha = if (palette.isDark) 0.45f else 0.38f)
+        palette.isDark -> Color.White.copy(alpha = 0.22f)
+        else -> accent.primary.copy(alpha = 0.24f)
+    }
+    val shadow = if (palette.isDark) {
+        Color.Black.copy(alpha = 0.46f)
+    } else {
+        accent.primary.copy(alpha = 0.10f)
+    }
+    val resolvedElevation = if (palette.isDark) {
+        elevation
+    } else {
+        (elevation * 0.35f).coerceAtMost(4.dp)
+    }
+    return LiquidGlassSpec(
+        tint = startSurface,
+        tintEnd = endSurface,
+        frost = frost,
+        backdropAlpha = resolvedAlpha,
+        rim = rimColor,
+        rimWidth = 1.dp,
+        sheen = sheen,
+        elevation = resolvedElevation,
+        shadowColor = shadow,
+        highlight = highlight
+    )
+}
+
+/**
+ * Applies the Apple iOS 26 Liquid Glass finish to any composable:
+ *
+ * 1. Soft optical drop shadow for floating depth.
+ * 2. Translucent multi-stop refractive lens fill (`tint` -> `tintEnd`).
+ * 3. Top inner optical lens curvature highlight + subtle bottom bounce reflection.
+ * 4. Diagonal specular rim border (bright top-left white highlight transitioning
+ *    through `spec.rim` to a soft bottom-right edge reflection).
+ */
 fun Modifier.liquidGlass(
     spec: LiquidGlassSpec,
     shape: Shape = RoundedCornerShape(VennelaTokens.radiusCard)
 ): Modifier {
-    val backdrop = LocalBackdropImage.current
-    val density = LocalDensity.current
-    val tier by FidelityGovernor.activeTier.collectAsState()
-    val textures = tier != FidelityTier.TIER_3_PERFORMANCE
-
-    var target by remember { mutableStateOf(BackdropTarget()) }
-
-    val base = this
-        .shadow(
+    val fillBrush = Brush.verticalGradient(
+        0.0f to spec.tint,
+        0.55f to spec.tintEnd,
+        1.0f to spec.tintEnd.copy(alpha = (spec.tintEnd.alpha * 0.94f).coerceIn(0f, 1f))
+    )
+    val topRightCornerHighlight = Color.White.copy(
+        alpha = (spec.sheen * 1.35f).coerceIn(0.18f, 0.68f)
+    )
+    val bottomEdgeRim = spec.rim.copy(
+        alpha = (spec.rim.alpha * 0.42f).coerceIn(0.06f, 0.36f)
+    )
+    val rimBrush = Brush.linearGradient(
+        colors = listOf(
+            topRightCornerHighlight,
+            spec.rim,
+            bottomEdgeRim,
+            Color.White.copy(alpha = (spec.sheen * 0.55f).coerceIn(0.08f, 0.28f))
+        ),
+        start = Offset.Zero,
+        end = Offset(900f, 900f)
+    )
+    val shadowModifier = if (spec.elevation > 0.dp) {
+        Modifier.shadow(
             elevation = spec.elevation,
             shape = shape,
             clip = false,
             ambientColor = spec.shadowColor,
             spotColor = spec.shadowColor
         )
+    } else {
+        Modifier
+    }
+    return this
+        .then(shadowModifier)
         .clip(shape)
-        .onGloballyPositioned { coords ->
-            val pos = coords.positionInRoot()
-            val next = BackdropTarget(
-                position = IntOffset(pos.x.roundToInt(), pos.y.roundToInt()),
-                size = IntSize(coords.size.width, coords.size.height)
-            )
-            if (next != target) target = next
+        .background(fillBrush, shape)
+        .drawWithContent {
+            drawLiquidGlassFinish(spec)
         }
-
-    if (!textures || spec.frost <= 0.dp) {
-        return base.drawWithCache {
-            val specular = brushSpecular(size, spec.rim, spec.highlight)
-            onDrawBehind {
-                drawRect(Brush.verticalGradient(listOf(spec.tint, spec.tintEnd)))
-                drawLiquidGlassFinish(spec, specular, size)
-            }
-        }
-    }
-
-    return base.drawWithCache {
-        val densityValue = density.density
-        val radius = spec.frost.value
-        val shader = frostBackdrop(backdrop, target, radius, densityValue)
-        val specular = brushSpecular(size, spec.rim, spec.highlight)
-        onDrawBehind {
-            if (shader != null) {
-                drawFrostedBackdrop(shader, spec.backdropAlpha)
-            } else {
-                drawRect(spec.tint.copy(alpha = 0.72f))
-            }
-            // Tinted body on top of the frost.
-            drawRect(
-                Brush.verticalGradient(
-                    listOf(
-                        spec.tint.copy(alpha = spec.tint.alpha),
-                        spec.tintEnd.copy(alpha = spec.tintEnd.alpha * 0.82f)
-                    )
-                )
-            )
-            drawLiquidGlassFinish(spec, specular, size)
-        }
-    }
+        .border(width = spec.rimWidth, brush = rimBrush, shape = shape)
 }
 
-/* ------------------------------------------------------------------------- */
-/* Drawing primitives.                                                        */
-/* ------------------------------------------------------------------------- */
-
-private fun DrawScope.drawFrostedBackdrop(shader: android.graphics.Shader, alpha: Float) {
-    drawIntoCanvas { canvas ->
-        val native = canvas.nativeCanvas
-        val paint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
-        paint.shader = shader
-        paint.alpha = (alpha.coerceIn(0f, 1f) * 255).roundToInt()
-        native.drawRect(0f, 0f, size.width, size.height, paint)
-    }
-}
-
-/** Interior sheen + bright top rim + hairline edge, the glass signature. */
-private fun DrawScope.drawLiquidGlassFinish(
-    spec: LiquidGlassSpec,
-    specular: Brush,
-    size: Size
-) {
-    // Interior sheen falling away from the top edge.
-    if (spec.sheen > 0f) {
-        drawRect(
-            Brush.verticalGradient(
-                0f to Color.White.copy(alpha = spec.sheen),
-                0.42f to Color.Transparent,
-                1f to Color.Transparent
-            )
-        )
-    }
-
-    // Liquid highlight blob in the upper-left, like light through a droplet.
-    if (spec.highlight > 0f) {
-        drawRect(brush = specular)
-    }
-
-    // Rim: bright at the top, almost invisible at the bottom.
-    val rimPx = spec.rimWidth.toPx()
-    if (rimPx > 0f) {
+private fun ContentDrawScope.drawLiquidGlassFinish(spec: LiquidGlassSpec) {
+    // 1. Top refractive lens sheen across the upper 38% of the glass surface.
+    if (spec.sheen > 0f && size.height > 0f && size.width > 0f) {
+        val sheenHeight = (size.height * 0.40f).coerceAtLeast(1f)
         drawRect(
             brush = Brush.verticalGradient(
-                listOf(
-                    spec.rim.copy(alpha = (spec.rim.alpha * 1.5f).coerceAtMost(1f)),
-                    spec.rim.copy(alpha = spec.rim.alpha * 0.45f),
-                    spec.rim.copy(alpha = spec.rim.alpha * 0.12f)
-                )
+                0.0f to Color.White.copy(alpha = (spec.sheen * 0.85f).coerceIn(0f, 0.38f)),
+                0.45f to Color.White.copy(alpha = (spec.sheen * 0.25f).coerceIn(0f, 0.14f)),
+                1.0f to Color.Transparent,
+                startY = 0f,
+                endY = sheenHeight
             ),
-            style = Stroke(width = rimPx)
+            topLeft = Offset.Zero,
+            size = Size(size.width, sheenHeight)
         )
     }
+
+    // 2. Crisp top-edge specular caustic line (simulates light hitting curved glass).
+    if (spec.highlight > 0f && size.width > 0f) {
+        val highlightHeight = 1.5.dp.toPx().coerceAtmost(size.height)
+        drawRect(
+            brush = Brush.horizontalGradient(
+                0.0f to Color.White.copy(alpha = (spec.highlight * 0.35f).coerceIn(0f, 0.25f)),
+                0.25f to Color.White.copy(alpha = (spec.highlight * 1.35f).coerceIn(0f, 0.52f)),
+                0.75f to Color.White.copy(alpha = (spec.highlight * 1.10f).coerceIn(0f, 0.44f)),
+                1.0f to Color.White.copy(alpha = (spec.highlight * 0.30f).coerceIn(0f, 0.20f))
+            ),
+            topLeft = Offset.Zero,
+            size = Size(size.width, highlightHeight)
+        )
+
+        // 3. Subtle bottom inner bounce light for authentic 3D glass thickness.
+        val bounceHeight = (size.height * 0.18f).coerceAtLeast(1f)
+        drawRect(
+            brush = Brush.verticalGradient(
+                0.0f to Color.Transparent,
+                1.0f to Color.White.copy(alpha = (spec.highlight * 0.22f).coerceIn(0f, 0.10f)),
+                startY = size.height - bounceHeight,
+                endY = size.height
+            ),
+            topLeft = Offset(0f, size.height - bounceHeight),
+            size = Size(size.width, bounceHeight)
+        )
+    }
+
+    drawContent()
 }
 
-private fun brushSpecular(size: Size, rim: Color, strength: Float): Brush {
-    if (strength <= 0f || size.width <= 0f) return Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
-    val radius = size.maxDimension * 0.85f
-    return Brush.radialGradient(
-        colors = listOf(
-            Color.White.copy(alpha = strength),
-            Color.White.copy(alpha = strength * 0.35f),
-            Color.Transparent
-        ),
-        center = Offset(size.width * 0.24f, size.height * 0.10f),
-        radius = radius
-    )
-}
-
-/* ------------------------------------------------------------------------- */
-/* Palette-aware spec factory.                                                */
-/* ------------------------------------------------------------------------- */
+private fun Float.coerceAtmost(maximumValue: Float): Float =
+    if (this > maximumValue) maximumValue else this
 
 /**
- * Builds a glass spec from the active palette so every surface automatically
- * follows the current theme, accent and light/dark mode.
+ * Applies a hardware RenderEffect blur to the composable itself on Android 12+
+ * (API 31+), degrading to a no-op on older API levels where the translucent
+ * gradient + specular rim in [liquidGlass] carries the frosted appearance.
+ */
+fun Modifier.frostedSelfBlur(radius: Dp): Modifier =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && radius > 0.dp) {
+        this.blur(radius = radius, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+    } else {
+        this
+    }
+
+/**
+ * Draws the ambient liquid-glass atmosphere behind a full-screen page: the
+ * vertical sky gradient plus two soft radial colour blooms driven by the
+ * active [AccentOption] and [VennelaPalette].
  */
 @Composable
-fun liquidGlassSpec(
-    alpha: Float = 0.42f,
-    frost: Dp = 18.dp,
-    elevation: Dp = 10.dp,
-    sheen: Float = 0.22f,
-    highlight: Float = 0.16f,
-    strong: Boolean = false
-): LiquidGlassSpec {
+fun Modifier.liquidAtmosphere(): Modifier {
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
-    val bodyAlpha = if (strong) alpha * 1.35f else alpha
-    return LiquidGlassSpec(
-        tint = palette.cardSurface.copy(alpha = bodyAlpha.coerceIn(0.05f, 0.92f)),
-        tintEnd = palette.cardSurfaceStrong.copy(alpha = (bodyAlpha * 0.78f).coerceIn(0.04f, 0.92f)),
-        frost = frost,
-        backdropAlpha = if (palette.isDark) 0.62f else 0.72f,
-        rim = accent.secondary.copy(alpha = if (palette.isDark) 0.46f else 0.48f),
-        sheen = sheen,
-        elevation = elevation,
-        shadowColor = if (palette.isDark) Color(0x99000000) else Color(0x330B142B),
-        highlight = highlight
-    )
+    return this
+        .background(
+            Brush.verticalGradient(
+                colors = listOf(
+                    palette.backgroundTop,
+                    palette.backgroundMid,
+                    palette.backgroundBottom
+                )
+            )
+        )
+        .drawWithContent {
+            val w = size.width
+            val h = size.height
+            if (w > 0f && h > 0f) {
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            accent.primary.copy(alpha = if (palette.isDark) 0.16f else 0.10f),
+                            Color.Transparent
+                        ),
+                        center = Offset(w * 0.85f, h * 0.10f),
+                        radius = w * 0.72f
+                    ),
+                    radius = w * 0.72f,
+                    center = Offset(w * 0.85f, h * 0.10f)
+                )
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            accent.secondary.copy(alpha = if (palette.isDark) 0.14f else 0.08f),
+                            Color.Transparent
+                        ),
+                        center = Offset(w * 0.15f, h * 0.88f),
+                        radius = w * 0.78f
+                    ),
+                    radius = w * 0.78f,
+                    center = Offset(w * 0.15f, h * 0.88f)
+                )
+            }
+            drawContent()
+        }
 }
-
-

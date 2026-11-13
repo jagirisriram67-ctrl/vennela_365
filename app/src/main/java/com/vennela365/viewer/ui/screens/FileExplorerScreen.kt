@@ -68,6 +68,8 @@ import com.vennela365.viewer.model.FileItem
 import com.vennela365.viewer.theme.LocalVennelaAccent
 import com.vennela365.viewer.theme.LocalVennelaPalette
 import com.vennela365.viewer.theme.LiquidMotion
+import androidx.compose.ui.platform.testTag
+import com.vennela365.viewer.theme.VennelaFonts
 import com.vennela365.viewer.theme.VennelaTokens
 import com.vennela365.viewer.theme.CatAmber
 import com.vennela365.viewer.theme.CatBlue
@@ -289,7 +291,9 @@ fun FileExplorerScreen(viewModel: MainViewModel) {
                 } else {
                     GlassAddButton(
                         onClick = { showAddSheet = true },
-                        modifier = Modifier.padding(end = VennelaTokens.gutter, bottom = VennelaTokens.spaceSm)
+                        modifier = Modifier
+                            .padding(end = VennelaTokens.gutter, bottom = VennelaTokens.spaceSm)
+                            .testTag("explorer_add_fab")
                     )
                 }
                 FloatingDockNav(
@@ -310,19 +314,27 @@ fun FileExplorerScreen(viewModel: MainViewModel) {
             LiquidIconButton(
                 icon = Icons.Default.Search,
                 contentDescription = "Search files",
+                modifier = Modifier.testTag("explorer_search_button"),
                 onClick = { viewModel.navigateTo(Screen.UniversalSearch) }
             )
             LiquidIconButton(
                 icon = Icons.Default.MoreVert,
                 contentDescription = "More options",
+                modifier = Modifier.testTag("explorer_more_button"),
                 onClick = { showAddSheet = true }
             )
         }
     ) { pagePadding ->
-        LazyVerticalGrid(
-            columns = if (gridMode) GridCells.Fixed(2) else GridCells.Fixed(1),
-            state = explorerGridState,
+        Box(
             modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.TopCenter
+        ) {
+        LazyVerticalGrid(
+            columns = if (gridMode) GridCells.Adaptive(minSize = 156.dp) else GridCells.Fixed(1),
+            state = explorerGridState,
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = 920.dp),
             contentPadding = PaddingValues(
                 start = VennelaTokens.gutter,
                 end = VennelaTokens.gutter,
@@ -379,7 +391,8 @@ fun FileExplorerScreen(viewModel: MainViewModel) {
 
                     ViewModeToggle(
                         gridMode = gridMode,
-                        onModeChange = { gridMode = it }
+                        onModeChange = { gridMode = it },
+                        modifier = Modifier.testTag("explorer_view_toggle")
                     )
                 }
             }
@@ -478,6 +491,8 @@ fun FileExplorerScreen(viewModel: MainViewModel) {
                         )
                         Row(
                             modifier = Modifier
+                                .testTag("explorer_browse_folder_button")
+                                .heightIn(min = VennelaTokens.touchTargetMin)
                                 .clip(RoundedCornerShape(VennelaTokens.radiusPill))
                                 .background(
                                     Brush.horizontalGradient(
@@ -506,6 +521,7 @@ fun FileExplorerScreen(viewModel: MainViewModel) {
                             Text(
                                 "Browse a folder",
                                 color = Color.White,
+                                fontFamily = VennelaFonts.Sans,
                                 fontSize = VennelaTokens.caption,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1
@@ -546,7 +562,8 @@ fun FileExplorerScreen(viewModel: MainViewModel) {
                             selectionActive = selectionActive,
                             modifier = Modifier.staggeredEntrance(index),
                             onClick = { openOrSelect(file) },
-                            onLongClick = { toggleSelection(file) }
+                            onLongClick = { toggleSelection(file) },
+                            onInfoClick = { infoFile = file }
                         )
                     }
                 } else {
@@ -566,11 +583,13 @@ fun FileExplorerScreen(viewModel: MainViewModel) {
                             selectionActive = selectionActive,
                             modifier = Modifier.staggeredEntrance(index),
                             onClick = { openOrSelect(file) },
-                            onLongClick = { toggleSelection(file) }
+                            onLongClick = { toggleSelection(file) },
+                            onInfoClick = { infoFile = file }
                         )
                     }
                 }
             }
+        }
         }
     }
 
@@ -832,29 +851,20 @@ private fun ViewModeToggle(
     val accent = LocalVennelaAccent.current
     val palette = LocalVennelaPalette.current
     val spec = liquidGlassSpec(
-        alpha = 0.46f,
+        alpha = if (palette.isDark) 0.56f else 0.84f,
         frost = VennelaTokens.frostLight,
-        elevation = VennelaTokens.elevationBar,
-        sheen = 0.24f,
-        highlight = 0.20f
-    ).copy(
-        rim = accent.secondary.copy(alpha = 0.56f),
-        shadowColor = accent.primary.copy(alpha = 0.36f)
+        elevation = VennelaTokens.elevationRaised,
+        sheen = 0.22f,
+        highlight = 0.18f
     )
-    val shape = RoundedCornerShape(VennelaTokens.radiusTile)
+    val shape = RoundedCornerShape(VennelaTokens.radiusPill)
 
     BoxWithConstraints(
         modifier = modifier
-            .height(48.dp)
-            .shadow(
-                elevation = 14.dp,
-                shape = shape,
-                clip = false,
-                ambientColor = accent.secondary.copy(alpha = 0.40f),
-                spotColor = accent.primary.copy(alpha = 0.40f)
-            )
+            .width(88.dp)
+            .height(42.dp)
             .liquidGlass(spec, shape)
-            .padding(VennelaTokens.spaceXs)
+            .padding(3.dp)
     ) {
         val half = maxWidth / 2
         val offset by animateDpAsState(
@@ -863,24 +873,47 @@ private fun ViewModeToggle(
             label = "viewModeOffset"
         )
 
+        val activeFill = if (palette.isDark) {
+            Brush.verticalGradient(
+                listOf(
+                    Color.White.copy(alpha = 0.22f),
+                    accent.primary.copy(alpha = 0.44f),
+                    accent.secondary.copy(alpha = 0.28f)
+                )
+            )
+        } else {
+            Brush.verticalGradient(
+                listOf(
+                    Color.White.copy(alpha = 0.96f),
+                    accent.primary.copy(alpha = 0.20f)
+                )
+            )
+        }
+        val activeRim = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = if (palette.isDark) 0.58f else 0.94f),
+                accent.secondary.copy(alpha = 0.42f)
+            )
+        )
+
         Box(
             modifier = Modifier
                 .offset(x = offset)
                 .width(half)
                 .fillMaxHeight()
                 .shadow(
-                    elevation = 10.dp,
-                    shape = RoundedCornerShape(VennelaTokens.radiusControl),
+                    elevation = 6.dp,
+                    shape = RoundedCornerShape(VennelaTokens.radiusPill),
                     clip = false,
-                    ambientColor = accent.secondary.copy(alpha = 0.60f),
-                    spotColor = accent.primary.copy(alpha = 0.60f)
+                    ambientColor = accent.primary.copy(alpha = 0.35f),
+                    spotColor = accent.secondary.copy(alpha = 0.35f)
                 )
-                .clip(RoundedCornerShape(VennelaTokens.radiusControl))
-                .background(Brush.horizontalGradient(listOf(accent.primary, accent.secondary)))
+                .clip(RoundedCornerShape(VennelaTokens.radiusPill))
+                .background(activeFill)
                 .border(
                     1.dp,
-                    Color.White.copy(alpha = 0.38f),
-                    RoundedCornerShape(VennelaTokens.radiusControl)
+                    activeRim,
+                    RoundedCornerShape(VennelaTokens.radiusPill)
                 )
         )
 
@@ -889,7 +922,11 @@ private fun ViewModeToggle(
                 icon = Icons.AutoMirrored.Filled.FormatListBulleted,
                 contentDescription = "List view",
                 active = !gridMode,
-                tint = if (!gridMode) palette.textPrimary else palette.textTertiary,
+                tint = if (!gridMode) {
+                    if (palette.isDark) Color.White else accent.primary
+                } else {
+                    palette.textSecondary
+                },
                 modifier = Modifier.weight(1f),
                 onClick = { onModeChange(false) }
             )
@@ -897,7 +934,11 @@ private fun ViewModeToggle(
                 icon = Icons.Default.GridView,
                 contentDescription = "Grid view",
                 active = gridMode,
-                tint = if (gridMode) palette.textPrimary else palette.textTertiary,
+                tint = if (gridMode) {
+                    if (palette.isDark) Color.White else accent.primary
+                } else {
+                    palette.textSecondary
+                },
                 modifier = Modifier.weight(1f),
                 onClick = { onModeChange(true) }
             )
@@ -915,14 +956,14 @@ private fun ToggleSegment(
     onClick: () -> Unit
 ) {
     val scale by animateFloatAsState(
-        targetValue = if (active) 1.14f else 1f,
+        targetValue = if (active) 1.08f else 1f,
         animationSpec = LiquidMotion.press(),
         label = "toggleSegment"
     )
     Box(
         modifier = modifier
-            .pressScale(0.90f, onClick)
-            .padding(VennelaTokens.spaceXs),
+            .fillMaxHeight()
+            .pressScale(0.90f, onClick),
         contentAlignment = Alignment.Center
     ) {
         Icon(
@@ -930,7 +971,7 @@ private fun ToggleSegment(
             contentDescription = contentDescription,
             tint = tint,
             modifier = Modifier
-                .size(VennelaTokens.iconMd)
+                .size(18.dp)
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
@@ -949,8 +990,6 @@ private fun StorageUsageCard(
 ) {
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
-    // The bar grows from empty whenever the real figure changes, so storage
-    // pressure is felt as motion instead of read as a static label.
     val fraction = remember { Animatable(0f) }
     LaunchedEffect(storage.fractionUsed) {
         fraction.animateTo(
@@ -958,7 +997,6 @@ private fun StorageUsageCard(
             animationSpec = LiquidMotion.emphasis(LiquidMotion.durationHero)
         )
     }
-    // Slow aurora sheen travelling along the hero bar.
     val sheen = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -971,20 +1009,13 @@ private fun StorageUsageCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(
-                elevation = 20.dp,
-                shape = shape,
-                clip = false,
-                ambientColor = accent.secondary.copy(alpha = 0.44f),
-                spotColor = accent.primary.copy(alpha = 0.44f)
-            )
             .liquidGlass(
                 liquidGlassSpec(
-                    alpha = 0.56f,
+                    alpha = if (palette.isDark) 0.56f else 0.84f,
                     frost = VennelaTokens.frostRegular,
                     elevation = VennelaTokens.elevationCard,
-                    sheen = 0.26f,
-                    highlight = 0.22f
+                    sheen = 0.24f,
+                    highlight = 0.20f
                 ),
                 shape
             )
@@ -1011,6 +1042,7 @@ private fun StorageUsageCard(
                 Text(
                     "Internal storage",
                     color = palette.textPrimary,
+                    fontFamily = VennelaFonts.Sans,
                     fontSize = VennelaTokens.titleSmall,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
@@ -1018,6 +1050,7 @@ private fun StorageUsageCard(
                 Text(
                     text = "${(fraction.value * 100f).roundToInt()}%",
                     color = accent.secondary,
+                    fontFamily = VennelaFonts.Mono,
                     fontSize = VennelaTokens.caption,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(end = VennelaTokens.spaceSm)
@@ -1030,7 +1063,7 @@ private fun StorageUsageCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(11.dp)
+                    .height(10.dp)
                     .clip(RoundedCornerShape(VennelaTokens.radiusPill))
                     .background(palette.textPrimary.copy(alpha = 0.12f))
             ) {
@@ -1107,34 +1140,34 @@ private fun SortCapsule(label: String, onClick: () -> Unit) {
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
     val spec = liquidGlassSpec(
-        alpha = 0.48f,
+        alpha = if (palette.isDark) 0.52f else 0.84f,
         frost = VennelaTokens.frostLight,
         elevation = VennelaTokens.elevationRaised,
         sheen = 0.22f,
         highlight = 0.18f
-    ).copy(
-        rim = accent.secondary.copy(alpha = 0.62f),
-        shadowColor = accent.primary.copy(alpha = 0.34f)
     )
     Row(
         modifier = Modifier
+            .testTag("explorer_sort_button")
+            .heightIn(min = 36.dp)
             .liquidGlass(spec, RoundedCornerShape(VennelaTokens.radiusPill))
             .pressScale(0.94f, onClick)
-            .padding(horizontal = VennelaTokens.spaceMd, vertical = VennelaTokens.spaceSm),
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(VennelaTokens.spaceXs)
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
     ) {
         Icon(
             Icons.AutoMirrored.Filled.Sort,
             contentDescription = null,
             tint = accent.secondary,
-            modifier = Modifier.size(VennelaTokens.iconSm)
+            modifier = Modifier.size(16.dp)
         )
         Text(
             label,
             color = palette.textPrimary,
-            fontSize = VennelaTokens.caption,
-            fontWeight = FontWeight.Bold,
+            fontFamily = VennelaFonts.Sans,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
             maxLines = 1
         )
     }
@@ -1144,29 +1177,23 @@ private fun SortCapsule(label: String, onClick: () -> Unit) {
 @Composable
 private fun GlassAddButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val accent = LocalVennelaAccent.current
+    val palette = LocalVennelaPalette.current
     val spec = liquidGlassSpec(
-        alpha = 0.74f,
-        frost = VennelaTokens.frostLight,
+        alpha = 0.78f,
+        frost = VennelaTokens.frostHeavy,
         elevation = VennelaTokens.elevationDock,
         sheen = 0.30f,
         highlight = 0.24f
     ).copy(
-        tint = accent.primary.copy(alpha = 0.88f),
-        tintEnd = accent.secondary.copy(alpha = 0.66f),
-        rim = Color.White.copy(alpha = 0.52f),
-        shadowColor = accent.secondary.copy(alpha = 0.60f)
+        tint = if (palette.isDark) accent.primary.copy(alpha = 0.86f) else accent.primary,
+        tintEnd = accent.secondary.copy(alpha = 0.72f),
+        rim = Color.White.copy(alpha = 0.62f),
+        shadowColor = accent.primary.copy(alpha = 0.48f)
     )
 
     Box(
         modifier = modifier
-            .size(62.dp)
-            .shadow(
-                elevation = 22.dp,
-                shape = CircleShape,
-                clip = false,
-                ambientColor = accent.secondary.copy(alpha = 0.66f),
-                spotColor = accent.primary.copy(alpha = 0.66f)
-            )
+            .size(54.dp)
             .liquidGlass(spec, CircleShape)
             .pressScale(0.92f, onClick),
         contentAlignment = Alignment.Center
@@ -1174,8 +1201,8 @@ private fun GlassAddButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
         Icon(
             Icons.Default.Add,
             contentDescription = "Add files or folders",
-            tint = LocalVennelaPalette.current.textPrimary,
-            modifier = Modifier.size(VennelaTokens.iconXl)
+            tint = Color.White,
+            modifier = Modifier.size(24.dp)
         )
     }
 }
@@ -1215,11 +1242,11 @@ private fun ExplorerSelectionBar(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f)
             )
-            SelectionAction(Icons.Default.Share, "Share selected", true, accent.secondary, onShare)
-            SelectionAction(Icons.Default.Delete, "Delete selected", canDelete, errorCoral, onDelete)
-            SelectionAction(Icons.Default.Info, "Info for selected", true, accent.secondary, onInfo)
-            SelectionAction(Icons.Default.ContentCopy, "Copy selected names", true, accent.secondary, onCopy)
-            SelectionAction(Icons.Default.Close, "Exit selection", true, palette.textSecondary, onClear)
+            SelectionAction(Icons.Default.Share, "Share selected", true, accent.secondary, "explorer_selection_share", onShare)
+            SelectionAction(Icons.Default.Delete, "Delete selected", canDelete, errorCoral, "explorer_selection_delete", onDelete)
+            SelectionAction(Icons.Default.Info, "Info for selected", true, accent.secondary, "explorer_selection_info", onInfo)
+            SelectionAction(Icons.Default.ContentCopy, "Copy selected names", true, accent.secondary, "explorer_selection_copy", onCopy)
+            SelectionAction(Icons.Default.Close, "Exit selection", true, palette.textSecondary, "explorer_selection_clear", onClear)
         }
     }
 }
@@ -1230,10 +1257,12 @@ private fun SelectionAction(
     contentDescription: String,
     enabled: Boolean,
     tint: Color,
+    tag: String,
     onClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
+            .testTag(tag)
             .size(VennelaTokens.touchTargetMin)
             .clip(CircleShape)
             .pressScale(0.90f, if (enabled) onClick else null),
@@ -1496,7 +1525,8 @@ private fun ExplorerFolderRow(
     selectionActive: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
-    onLongClick: () -> Unit
+    onLongClick: () -> Unit,
+    onInfoClick: () -> Unit
 ) {
     val palette = LocalVennelaPalette.current
     val visual = folderVisual(file.name)
@@ -1518,6 +1548,7 @@ private fun ExplorerFolderRow(
                 Text(
                     file.name,
                     color = palette.textPrimary,
+                    fontFamily = VennelaFonts.Sans,
                     fontSize = VennelaTokens.titleSmall,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
@@ -1525,11 +1556,12 @@ private fun ExplorerFolderRow(
                 )
                 Text(
                     text = if (file.itemCount > 0) {
-                        "Folder - ${file.itemCount} items"
+                        "Folder · ${file.itemCount} items"
                     } else {
-                        "Folder - ${file.formattedDate}"
+                        "Folder · ${file.formattedDate}"
                     },
                     color = palette.textSecondary,
+                    fontFamily = VennelaFonts.Mono,
                     fontSize = VennelaTokens.caption,
                     fontWeight = FontWeight.Medium
                 )
@@ -1537,13 +1569,17 @@ private fun ExplorerFolderRow(
             if (selectionActive) {
                 SelectionMark(selected)
             } else {
-                Icon(
-                    Icons.Default.MoreVert,
-                    contentDescription = "Long press for options",
-                    tint = palette.textTertiary,
-                    modifier = Modifier.size(VennelaTokens.iconMd)
-                )
-                Spacer(modifier = Modifier.width(VennelaTokens.spaceSm))
+                IconButton(
+                    onClick = onInfoClick,
+                    modifier = Modifier.size(VennelaTokens.touchTargetMin)
+                ) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = "Details for ${file.name}",
+                        tint = palette.textTertiary,
+                        modifier = Modifier.size(VennelaTokens.iconMd)
+                    )
+                }
                 Icon(
                     Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
@@ -1562,7 +1598,8 @@ private fun ExplorerFileRow(
     selectionActive: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
-    onLongClick: () -> Unit
+    onLongClick: () -> Unit,
+    onInfoClick: () -> Unit
 ) {
     val palette = LocalVennelaPalette.current
     GlassSurface(
@@ -1583,6 +1620,7 @@ private fun ExplorerFileRow(
                 Text(
                     file.name,
                     color = palette.textPrimary,
+                    fontFamily = VennelaFonts.Sans,
                     fontSize = VennelaTokens.titleSmall,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
@@ -1590,8 +1628,9 @@ private fun ExplorerFileRow(
                 )
                 Spacer(modifier = Modifier.height(VennelaTokens.spaceXxs))
                 Text(
-                    "${file.extension.uppercase()} - ${file.formattedSize} - ${file.formattedDate}",
+                    "${file.extension.uppercase()} · ${file.formattedSize} · ${file.formattedDate}",
                     color = palette.textSecondary,
+                    fontFamily = VennelaFonts.Mono,
                     fontSize = VennelaTokens.caption,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
@@ -1601,6 +1640,17 @@ private fun ExplorerFileRow(
             if (selectionActive) {
                 SelectionMark(selected)
             } else {
+                IconButton(
+                    onClick = onInfoClick,
+                    modifier = Modifier.size(VennelaTokens.touchTargetMin)
+                ) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = "Details for ${file.name}",
+                        tint = palette.textTertiary,
+                        modifier = Modifier.size(VennelaTokens.iconMd)
+                    )
+                }
                 Icon(
                     Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,

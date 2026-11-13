@@ -203,4 +203,42 @@ class LiquidGlassSystemTest {
     fun `touch targets meet the accessibility minimum`() {
         assertTrue(VennelaTokens.touchTargetMin.value >= 48f)
     }
+
+    @Test
+    fun `switching between dark and light palette produces distinct atmosphere luminance`() {
+        val accent = AccentOption.ICE_BLUE.toAccent()
+        val darkBitmap = Bitmap.createBitmap(180, 400, Bitmap.Config.ARGB_8888)
+        val lightBitmap = Bitmap.createBitmap(180, 400, Bitmap.Config.ARGB_8888)
+
+        LiquidAtmosphere.render(
+            canvas = Canvas(darkBitmap),
+            width = 180f,
+            height = 400f,
+            palette = DarkVennelaPalette.tinted(accent),
+            accent = accent,
+            quality = 2
+        )
+        LiquidAtmosphere.render(
+            canvas = Canvas(lightBitmap),
+            width = 180f,
+            height = 400f,
+            palette = LightVennelaPalette.tinted(accent),
+            accent = accent,
+            quality = 2
+        )
+
+        val darkPixel = darkBitmap.getPixel(90, 200)
+        val lightPixel = lightBitmap.getPixel(90, 200)
+        val darkLum = android.graphics.Color.red(darkPixel) +
+            android.graphics.Color.green(darkPixel) +
+            android.graphics.Color.blue(darkPixel)
+        val lightLum = android.graphics.Color.red(lightPixel) +
+            android.graphics.Color.green(lightPixel) +
+            android.graphics.Color.blue(lightPixel)
+
+        assertTrue(
+            "Light mode atmosphere luminance ($lightLum) must be significantly brighter than Dark mode ($darkLum)",
+            lightLum > darkLum + 300
+        )
+    }
 }

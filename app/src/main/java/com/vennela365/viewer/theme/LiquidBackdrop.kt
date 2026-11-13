@@ -66,28 +66,33 @@ private const val BACKDROP_TARGET_WIDTH = 180
 fun LiquidBackdrop(
     modifier: Modifier = Modifier,
     drawAtmosphere: Boolean = true,
+    cacheKey: Any? = null,
     render: ComposeCanvas.(size: androidx.compose.ui.geometry.Size) -> Unit,
     content: @Composable BoxScope.() -> Unit
 ) {
+    val palette = LocalVennelaPalette.current
+    val accent = LocalVennelaAccent.current
+
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val widthPx = constraints.maxWidth
         val heightPx = constraints.maxHeight
 
-        val backdrop = remember(widthPx, heightPx) {
-            val w = max(1, (widthPx * (BACKDROP_TARGET_WIDTH.toFloat() / widthPx)).roundToInt())
-            val scale = BACKDROP_TARGET_WIDTH.toFloat() / widthPx
-            val h = max(1, (heightPx * scale).roundToInt())
+        val backdrop = remember(widthPx, heightPx, palette, accent, cacheKey) {
+            val safeWidth = max(1, widthPx)
+            val safeHeight = max(1, heightPx)
+            val scale = BACKDROP_TARGET_WIDTH.toFloat() / safeWidth
+            val w = max(1, (safeWidth * scale).roundToInt())
+            val h = max(1, (safeHeight * scale).roundToInt())
             val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
             val native = Canvas(bmp)
             val save = native.save()
             native.scale(scale, scale)
-            render(ComposeCanvas(native), androidx.compose.ui.geometry.Size(widthPx.toFloat(), heightPx.toFloat()))
+            render(
+                ComposeCanvas(native),
+                androidx.compose.ui.geometry.Size(safeWidth.toFloat(), safeHeight.toFloat())
+            )
             native.restoreToCount(save)
             BackdropImage(bmp, scale, bmp.asImageBitmap())
-        }
-
-        DisposableEffect(backdrop) {
-            onDispose { backdrop.recycle() }
         }
 
         CompositionLocalProvider(LocalBackdropImage provides backdrop) {
@@ -97,6 +102,7 @@ fun LiquidBackdrop(
                     .then(
                         if (drawAtmosphere) {
                             Modifier.drawBehind {
+                                drawRect(color = palette.backgroundBottom)
                                 drawImage(
                                     image = backdrop.image,
                                     dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt())
