@@ -1065,7 +1065,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // 2. Set active file state
         _selectedFile.value = file
         _viewerState.value = ViewerState.Detecting
-        _documentText.value = ""
+        _documentText.value = file.sampleContent
         _documentTruncated.value = false
 
         // 3. Launch managed hex dump job
@@ -1130,7 +1130,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     ) -> {
                         val extracted = DocumentTextExtractor.extract(ctx, file.uri, file.extension)
                         if (_selectedFile.value?.id == file.id) {
-                            _documentText.value = extracted.text
+                            _documentText.value = extracted.text.ifBlank { file.sampleContent }
                             _documentTruncated.value = extracted.truncated
                         }
                     }

@@ -56,6 +56,7 @@ fun NotebookViewerScreen(viewModel: MainViewModel) {
     val accent = LocalVennelaAccent.current
     val file by viewModel.selectedFile.collectAsState()
     val docText by viewModel.documentText.collectAsState()
+    val activeSuite by viewModel.preferredSuiteStyle.collectAsState()
 
     val source = docText.ifBlank { file?.sampleContent.orEmpty() }
     val ext = file?.extension?.lowercase().orEmpty().ifBlank { "ipynb" }
@@ -82,7 +83,7 @@ fun NotebookViewerScreen(viewModel: MainViewModel) {
             ) {
                 ViewerTopBar(
                     title = file?.name ?: "Notebook",
-                    subtitle = "${notebook.kernelName} • ${notebook.cells.size} cells",
+                    subtitle = "${activeSuite.badge} • ${notebook.kernelName} • ${notebook.cells.size} cells",
                     onBack = { viewModel.navigateBack() },
                     leadingIcon = Icons.Default.Code,
                     actions = {
@@ -144,6 +145,14 @@ fun NotebookViewerScreen(viewModel: MainViewModel) {
                     ),
                     verticalArrangement = Arrangement.spacedBy(VennelaTokens.spaceMd)
                 ) {
+                    item(key = "nb_suite_strip") {
+                        SuiteStyleSwitcherStrip(
+                            activeSuite = activeSuite,
+                            onSelectSuite = { viewModel.setPreferredSuiteStyle(it) },
+                            isDark = palette.isDark
+                        )
+                    }
+
                     item(key = "header") {
                         GlassCard(alpha = 0.50f) {
                             Row(

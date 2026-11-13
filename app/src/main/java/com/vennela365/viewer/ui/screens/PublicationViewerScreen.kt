@@ -64,6 +64,7 @@ private enum class BookPaperTheme(
 ) {
     LUNAR("Lunar", Color(0xFF0E1422), Color(0xFFF1F5F9), Color(0xFF94A3B8)),
     PAPER("Paper", Color(0xFFFAF8F4), Color(0xFF1E293B), Color(0xFF64748B)),
+    WPS_GREEN("Eye-Care", Color(0xFFC7EDCC), Color(0xFF102A16), Color(0xFF35593E)),
     SEPIA("Sepia", Color(0xFFF3E9D2), Color(0xFF3E2F20), Color(0xFF7C6650)),
     AMOLED("AMOLED", Color(0xFF000000), Color(0xFFE2E8F0), Color(0xFF71717A))
 }
@@ -74,6 +75,7 @@ fun PublicationViewerScreen(viewModel: MainViewModel) {
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
     val file by viewModel.selectedFile.collectAsState()
+    val activeSuite by viewModel.preferredSuiteStyle.collectAsState()
     val scope = rememberCoroutineScope()
 
     var doc by remember { mutableStateOf<PublicationDocument?>(null) }
@@ -85,9 +87,18 @@ fun PublicationViewerScreen(viewModel: MainViewModel) {
     var showSearchBar by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var paperTheme by remember { mutableStateOf(if (palette.isDark) BookPaperTheme.LUNAR else BookPaperTheme.PAPER) }
-    var useSerif by remember { mutableStateOf(true) }
+    var useSerif by remember { mutableStateOf(false) }
     var fontSizeSp by remember { mutableIntStateOf(16) }
     var lineHeightMult by remember { mutableFloatStateOf(1.58f) }
+
+    LaunchedEffect(activeSuite) {
+        paperTheme = when (activeSuite) {
+            ViewerSuiteStyle.WPS_SUPER -> BookPaperTheme.WPS_GREEN
+            ViewerSuiteStyle.LIBRE_OFFICE -> BookPaperTheme.SEPIA
+            ViewerSuiteStyle.GOOGLE_WORKSPACE, ViewerSuiteStyle.MICROSOFT_365, ViewerSuiteStyle.OKEN_SCANNER ->
+                if (palette.isDark) BookPaperTheme.LUNAR else BookPaperTheme.PAPER
+        }
+    }
 
     LaunchedEffect(file?.id, file?.uri) {
         val current = file
@@ -169,6 +180,19 @@ fun PublicationViewerScreen(viewModel: MainViewModel) {
                         }
                     }
                 )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 880.dp)
+                        .padding(horizontal = VennelaTokens.gutter, vertical = 4.dp)
+                ) {
+                    SuiteStyleSwitcherStrip(
+                        activeSuite = activeSuite,
+                        onSelectSuite = { viewModel.setPreferredSuiteStyle(it) },
+                        isDark = palette.isDark
+                    )
+                }
 
                 if (showSearchBar && parsed != null && parsed.chapters.isNotEmpty()) {
                     Box(

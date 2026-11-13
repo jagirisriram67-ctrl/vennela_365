@@ -109,10 +109,15 @@ import com.vennela365.viewer.ui.components.ReaderPaper
 import com.vennela365.viewer.ui.components.ReaderProgressRule
 import com.vennela365.viewer.ui.components.ReaderSettingsSheet
 import com.vennela365.viewer.ui.components.ReaderTopToolbar
+import com.vennela365.viewer.ui.components.SuiteSessionState
+import com.vennela365.viewer.ui.components.SuiteStyleSwitcherStrip
 import com.vennela365.viewer.ui.components.VennelaBackground
 import com.vennela365.viewer.ui.components.VennelaEmptyState
 import com.vennela365.viewer.ui.components.VennelaErrorState
-import com.vennela365.viewer.ui.components.pressScale
+import com.vennela365.viewer.ui.components.ViewerSuiteStyle
+import com.vennela365.viewer.ui.components.WpsPaperTone
+import com.vennela365.viewer.ui.components. pressScale
+import com.vennela365.viewer.ui.components.rememberSuiteSessionState
 import com.vennela365.viewer.viewmodel.MainViewModel
 import com.vennela365.viewer.viewmodel.Screen
 import kotlinx.coroutines.Dispatchers
@@ -353,8 +358,10 @@ private fun annotateSourceLine(
 fun MarkdownViewerScreen(viewModel: MainViewModel) {
     val selectedFile by viewModel.selectedFile.collectAsState()
     val viewerColorMode by viewModel.viewerColorMode.collectAsState()
+    val activeSuite by viewModel.preferredSuiteStyle.collectAsState()
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
+    val suiteSession = rememberSuiteSessionState(activeSuite, palette.isDark)
     val density = androidx.compose.ui.platform.LocalDensity.current
     val context = androidx.compose.ui.platform.LocalContext.current
     val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
@@ -623,7 +630,10 @@ fun MarkdownViewerScreen(viewModel: MainViewModel) {
                                     blocks = blocks,
                                     spacing = spacing,
                                     activeBlock = if (isFindOpen) activeBlockOf(occurrences, activeMatch) else -1,
-                                    listState = listState
+                                    listState = listState,
+                                    activeSuite = activeSuite,
+                                    suiteSession = suiteSession,
+                                    onSelectSuite = { viewModel.setPreferredSuiteStyle(it) }
                                 )
                             }
                         }
@@ -644,7 +654,7 @@ fun MarkdownViewerScreen(viewModel: MainViewModel) {
             ) {
                 ReaderTopToolbar(
                     title = selectedFile?.name ?: "Markdown",
-                    subtitle = selectedFile?.formatInfo?.name,
+                    subtitle = "${activeSuite.badge} • ${selectedFile?.formatInfo?.name ?: "Markdown"}",
                     onBack = { viewModel.navigateBack() }
                 ) {
                     ReaderIconButton(
@@ -832,11 +842,17 @@ private fun RenderedReadingSurface(
     blocks: List<MdBlock>,
     spacing: Float,
     activeBlock: Int,
-    listState: LazyListState
+    listState: LazyListState,
+    activeSuite: ViewerSuiteStyle,
+    suiteSession: SuiteSessionState,
+    onSelectSuite: (ViewerSuiteStyle) -> Unit
 ) {
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
     val pageShape = RoundedCornerShape(VennelaTokens.radiusCard)
+    val paperBg = suiteSession.paperTone.paperColor
+    val inkColor = suiteSession.paperTone.inkColor
+    val mutedColor = suiteSession.paperTone.mutedInkColor
 
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -848,36 +864,21 @@ private fun RenderedReadingSurface(
             .widthIn(max = 820.dp)
             .fillMaxSize()
             .padding(horizontal = VennelaTokens.gutter)
-            // The floating chrome draws over the page, so the page must not
-            // reserve a band for it: only a slim top inset keeps the first line
-            // clear of the bar at rest, and the bottom breathing room lives in
-            // the scroll content so the last line can clear the tool pill.
             .padding(top = VennelaTokens.viewerTopInset, bottom = VennelaTokens.spaceXs)
             .shadow(
                 elevation = VennelaTokens.elevationOverlay,
                 shape = pageShape,
                 clip = false,
-                ambientColor = if (palette.isDark) accent.primary.copy(alpha = 0.40f) else Color(0x1F0B142B),
-                spotColor = if (palette.isDark) accent.secondary.copy(alpha = 0.40f) else Color(0x1F0B142B)
+                ambientColor = if (palette.isDark) activeSuite.brandPrimary.copy(alpha = 0.40f) else Color(0x1F0B142B),
+                spotColor = if (palette.isDark) activeSuite.brandSecondary.copy(alpha = 0.40f) else Color(0x1F0B142B)
             )
             .clip(pageShape)
-            .background(
-                if (palette.isDark) {
-                    Brush.verticalGradient(
-                        listOf(
-                            palette.cardSurfaceStrong.copy(alpha = 0.95f),
-                            palette.cardSurface.copy(alpha = 0.92f)
-                        )
-                    )
-                } else {
-                    Brush.verticalGradient(listOf(Color(0xFFFFFFFF), Color(0xFFF3F8FF)))
-                }
-            )
+            .background(paperBg)
             .border(
                 1.dp,
                 Brush.verticalGradient(
                     listOf(
-                        accent.secondary.copy(alpha = 0.50f),
+                        activeSuite.brandPrimary.copy(alpha = 0.50f),
                         Color.White.copy(alpha = 0.08f)
                     )
                 ),
@@ -892,36 +893,75 @@ private fun RenderedReadingSurface(
         ),
         verticalArrangement = Arrangement.spacedBy((VennelaTokens.spaceSm.value * spacing).dp)
     ) {
+        item(key = "md_suite_strip") {
+            SuiteStyleSwitcherStrip(
+                activeSuite = activeSuite,
+                onSelectSuite = onSelectSuite,
+                isDark = palette.isDark
+            )
+        }
+
         item(key = "md_page") {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(VennelaTokens.radiusChip))
-                        .background(accent.primary.copy(alpha = 0.16f))
-                        .border(
-                            1.dp,
-                            accent.primary.copy(alpha = 0.30f),
-                            RoundedCornerShape(VennelaTokens.radiusChip)
-                        )
-                        .padding(
-                            horizontal = VennelaTokens.spaceSm,
-                            vertical = VennelaTokens.spaceXxs
-                        )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "RENDERED",
-                        color = accent.primary,
-                        fontSize = VennelaTokens.nano,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(VennelaTokens.radiusChip))
+                            .background(activeSuite.brandPrimary.copy(alpha = 0.16f))
+                            .border(
+                                1.dp,
+                                activeSuite.brandPrimary.copy(alpha = 0.30f),
+                                RoundedCornerShape(VennelaTokens.radiusChip)
+                            )
+                            .padding(
+                                horizontal = VennelaTokens.spaceSm,
+                                vertical = VennelaTokens.spaceXxs
+                            )
+                    ) {
+                        Text(
+                            text = "${activeSuite.badge.uppercase()} • RENDERED",
+                            color = activeSuite.brandPrimary,
+                            fontFamily = VennelaFonts.OnePlusDisplay,
+                            fontSize = VennelaTokens.nano,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    if (activeSuite == ViewerSuiteStyle.WPS_SUPER) {
+                        WpsPaperTone.entries.take(3).forEach { tone ->
+                            val selected = suiteSession.paperTone == tone
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(VennelaTokens.radiusChip))
+                                    .background(tone.paperColor)
+                                    .border(
+                                        width = if (selected) 1.5.dp else 1.dp,
+                                        color = if (selected) activeSuite.brandPrimary else inkColor.copy(alpha = 0.25f),
+                                        shape = RoundedCornerShape(VennelaTokens.radiusChip)
+                                    )
+                                    .clickable { suiteSession.paperTone = tone }
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
+                                Text(
+                                    text = tone.label,
+                                    color = tone.inkColor,
+                                    fontFamily = VennelaFonts.Sans,
+                                    fontSize = 10.sp,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
                 }
                 Text(
                     text = "${blocks.size} blocks",
-                    color = palette.textTertiary,
+                    color = mutedColor,
                     fontSize = VennelaTokens.nano,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -941,7 +981,7 @@ private fun RenderedReadingSurface(
                         if (isActive) {
                             Modifier
                                 .clip(RoundedCornerShape(VennelaTokens.radiusChip))
-                                .background(accent.primary.copy(alpha = 0.14f))
+                                .background(activeSuite.brandPrimary.copy(alpha = 0.14f))
                                 .padding(horizontal = VennelaTokens.spaceSm, vertical = VennelaTokens.spaceXs)
                         } else {
                             Modifier
@@ -953,9 +993,9 @@ private fun RenderedReadingSurface(
                 } else {
                     MarkdownBlockView(
                         block = block,
-                        textColor = palette.textPrimary,
-                        mutedColor = palette.textSecondary,
-                        headingColor = palette.textPrimary
+                        textColor = inkColor,
+                        mutedColor = mutedColor,
+                        headingColor = inkColor
                     )
                 }
             }

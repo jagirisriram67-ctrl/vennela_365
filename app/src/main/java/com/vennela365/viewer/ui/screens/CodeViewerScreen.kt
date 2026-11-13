@@ -113,10 +113,12 @@ import com.vennela365.viewer.ui.components.ReaderIconButton
 import com.vennela365.viewer.ui.components.ReaderProgressRule
 import com.vennela365.viewer.ui.components.ReaderTopToolbar
 import com.vennela365.viewer.ui.components.StudySheetCompilerView
+import com.vennela365.viewer.ui.components.SuiteStyleSwitcherStrip
 import com.vennela365.viewer.ui.components.VennelaBackground
 import com.vennela365.viewer.ui.components.VennelaEmptyState
 import com.vennela365.viewer.ui.components.VennelaErrorState
 import com.vennela365.viewer.ui.components.VennelaLoadingState
+import com.vennela365.viewer.ui.components.ViewerSuiteStyle
 import com.vennela365.viewer.ui.components.pressScale
 import com.vennela365.viewer.viewmodel.MainViewModel
 import com.vennela365.viewer.viewmodel.Screen
@@ -228,6 +230,7 @@ fun CodeViewerScreen(viewModel: MainViewModel) {
     val isPrivacyActive by viewModel.isPrivacyActive.collectAsState()
     val enableMicroLouvre by viewModel.enableMicroLouvre.collectAsState()
     val isStudySheetActive by viewModel.isStudySheetActive.collectAsState()
+    val activeSuite by viewModel.preferredSuiteStyle.collectAsState()
 
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
@@ -520,7 +523,9 @@ fun CodeViewerScreen(viewModel: MainViewModel) {
                         listState = listState,
                         matchLines = matchSet,
                         activeMatchLine = activeMatchLine,
-                        totalLineCount = lines.size
+                        totalLineCount = lines.size,
+                        activeSuite = activeSuite,
+                        onSelectSuite = { viewModel.setPreferredSuiteStyle(it) }
                     )
                 }
             }
@@ -559,6 +564,8 @@ fun CodeViewerScreen(viewModel: MainViewModel) {
                 ReaderTopToolbar(
                     title = file?.name ?: "Code",
                     subtitle = buildString {
+                        append(activeSuite.badge)
+                        append("  •  ")
                         append(languageLabel)
                         if (rowCount > 0) {
                             append("  •  ")
@@ -819,7 +826,9 @@ private fun CodeReadingSurface(
     listState: LazyListState,
     matchLines: Set<Int>,
     activeMatchLine: Int,
-    totalLineCount: Int
+    totalLineCount: Int,
+    activeSuite: ViewerSuiteStyle,
+    onSelectSuite: (ViewerSuiteStyle) -> Unit
 ) {
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
@@ -848,8 +857,6 @@ private fun CodeReadingSurface(
                 .widthIn(max = 980.dp)
                 .fillMaxSize()
                 .padding(horizontal = VennelaTokens.gutter),
-            // The chrome floats above the page, so the page itself reserves no
-            // band: the first row clears the bar, and the last row clears the pill.
             contentPadding = PaddingValues(
                 start = VennelaTokens.spaceXs,
                 end = VennelaTokens.spaceSm,
@@ -857,6 +864,16 @@ private fun CodeReadingSurface(
                 bottom = VennelaTokens.spaceHuge + VennelaTokens.spaceXl
             )
         ) {
+            item(key = "code_suite_strip") {
+                Box(modifier = Modifier.padding(bottom = 8.dp)) {
+                    SuiteStyleSwitcherStrip(
+                        activeSuite = activeSuite,
+                        onSelectSuite = onSelectSuite,
+                        isDark = palette.isDark
+                    )
+                }
+            }
+
             items(count = rowCount, key = { index -> index }) { index ->
                 val isActive = index == activeMatchLine
                 val isHit = matchLines.contains(index)

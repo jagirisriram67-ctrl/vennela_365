@@ -7,6 +7,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -216,6 +218,15 @@ fun HomeScreen(viewModel: MainViewModel) {
                         isDark = palette.isDark
                     )
                 }
+            }
+
+            item(key = "home_instant_playground") {
+                InstantSuitePlaygroundCard(
+                    activeSuite = activeSuite,
+                    onOpenSample = { sampleItem ->
+                        viewModel.openFile(sampleItem)
+                    }
+                )
             }
 
             item(key = "home_categories") {
@@ -853,3 +864,458 @@ private fun RecentFileRow(
         }
     }
 }
+
+private data class SuiteSampleSpec(
+    val id: String,
+    val label: String,
+    val badge: String,
+    val fileName: String,
+    val extension: String,
+    val tint: Color
+)
+
+private val suitePlaygroundSamples = listOf(
+    SuiteSampleSpec(
+        id = "doc",
+        label = "Word / Docs",
+        badge = "DOCX",
+        fileName = "Vennela_365_Architecture_Whitepaper.docx",
+        extension = "docx",
+        tint = Color(0xFF1A73E8)
+    ),
+    SuiteSampleSpec(
+        id = "sheet",
+        label = "Excel / Sheets",
+        badge = "CSV",
+        fileName = "Vennela_Q4_Enterprise_Metrics.csv",
+        extension = "csv",
+        tint = Color(0xFF107C41)
+    ),
+    SuiteSampleSpec(
+        id = "slides",
+        label = "Slides / PPTX",
+        badge = "PPTX",
+        fileName = "Vennela_365_Global_Keynote.pptx",
+        extension = "pptx",
+        tint = Color(0xFFD24726)
+    ),
+    SuiteSampleSpec(
+        id = "pdf",
+        label = "Pro PDF Studio",
+        badge = "PDF",
+        fileName = "Vennela_365_Executive_Report.pdf",
+        extension = "pdf",
+        tint = Color(0xFFE53935)
+    ),
+    SuiteSampleSpec(
+        id = "scan",
+        label = "Oken HD Scan",
+        badge = "SCAN",
+        fileName = "Oken_HD_Signed_Contract_Scan.png",
+        extension = "png",
+        tint = Color(0xFF00B894)
+    ),
+    SuiteSampleSpec(
+        id = "md",
+        label = "Markdown Spec",
+        badge = "MD",
+        fileName = "Vennela_365_Engine_Spec.md",
+        extension = "md",
+        tint = Color(0xFF7C4DFF)
+    ),
+    SuiteSampleSpec(
+        id = "ipynb",
+        label = "Colab Notebook",
+        badge = "IPYNB",
+        fileName = "Vennela_AI_Telemetry_Lab.ipynb",
+        extension = "ipynb",
+        tint = Color(0xFFF57C00)
+    )
+)
+
+@Composable
+private fun InstantSuitePlaygroundCard(
+    activeSuite: ViewerSuiteStyle,
+    onOpenSample: (FileItem) -> Unit
+) {
+    val palette = LocalVennelaPalette.current
+    val context = LocalContext.current
+    val scroll = rememberScrollState()
+
+    GlassPanel(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("home_suite_playground"),
+        alpha = 0.45f
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "INSTANT SUITE SHOWCASE • 1-TAP LIVE FORMATS",
+                    color = palette.textSecondary,
+                    fontFamily = VennelaFonts.OnePlusDisplay,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.7.sp
+                )
+                Text(
+                    text = "Opens in ${activeSuite.badge}",
+                    color = activeSuite.brandPrimary,
+                    fontFamily = VennelaFonts.Sans,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(scroll),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                suitePlaygroundSamples.forEach { spec ->
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(spec.tint.copy(alpha = if (palette.isDark) 0.16f else 0.10f))
+                            .border(
+                                1.dp,
+                                spec.tint.copy(alpha = 0.38f),
+                                RoundedCornerShape(14.dp)
+                            )
+                            .pressScale {
+                                val fileItem = buildRealSuiteSampleFile(context, spec)
+                                onOpenSample(fileItem)
+                            }
+                            .testTag("home_sample_${spec.id}")
+                            .padding(horizontal = 12.dp, vertical = 9.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(spec.tint)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = spec.badge,
+                                    color = Color.White,
+                                    fontFamily = VennelaFonts.OnePlusDisplay,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                            }
+                            Text(
+                                text = spec.label,
+                                color = palette.textPrimary,
+                                fontFamily = VennelaFonts.OnePlusDisplay,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun buildRealSuiteSampleFile(
+    context: android.content.Context,
+    spec: SuiteSampleSpec
+): FileItem {
+    val dir = java.io.File(context.cacheDir, "suite_samples").apply { mkdirs() }
+    val targetFile = java.io.File(dir, spec.fileName)
+    var inlineText = ""
+
+    when (spec.id) {
+        "doc" -> {
+            inlineText = """
+                Vennela 365 Universal Multi-Suite Document Engine
+                
+                1. Executive Summary
+                Vennela 365 unifies the world's top five document & file viewing paradigms inside a single < 20 MB native Android engine powered by OnePlus Sans (Outfit + Inter) typography and Apple Liquid Glass surfaces:
+                • Google Workspace (Docs A4 Canvas, Sheets Formula Bar, Slides 16:9 Stage, Drive PDF Pill)
+                • Microsoft 365 (Word Fluent Ribbon, Excel Grid & Status Sums, PowerPoint Presenter Notes)
+                • WPS Office Super-App (Eye-Care Green #C7EDCC Paper, Warm Parchment, Night Obsidian, Teleprompter)
+                • LibreOffice Desktop (OpenDocument Margin Guides, Section Navigators, High-Density Inspector)
+                • Oken / CamScanner HD (Magic Color Document Filter, Crisp B&W Threshold, Corner Crop Handles & Official Stamp)
+                
+                2. Typography & Rendering Architecture
+                Every paragraph, heading, spreadsheet cell, and slide frame is styled with authentic geometric OnePlus Sans display weights paired with high-legibility body kerning. Switch between Page Layout and Pageless Reflow at any time from the command header.
+                
+                3. Offline-First Zero-Telemetry Guarantee
+                All parsing—from OOXML (.docx, .xlsx, .pptx) and OpenDocument (.odt, .ods, .odp) to native PdfRenderer streams and CBZ/EPUB archives—executes 100% locally on your device.
+            """.trimIndent()
+            runCatching { targetFile.writeText(inlineText) }
+        }
+        "sheet" -> {
+            inlineText = """
+                Region,Product Suite,Active Users (M),Latency (ms),APK Footprint (MB),Satisfaction (%)
+                North America,Google Workspace Mode,48.4,8.2,9.4,99.2
+                Europe,Microsoft 365 Fluent Mode,42.1,8.5,9.4,98.8
+                Asia-Pacific,WPS Super Eye-Care Mode,64.8,7.9,9.4,99.6
+                Global Open Source,LibreOffice ODF Mode,19.5,8.1,9.4,98.4
+                Mobile Enterprise,Oken Scanner HD Mode,53.2,7.6,9.4,99.5
+            """.trimIndent()
+            runCatching { targetFile.writeText(inlineText) }
+        }
+        "slides" -> {
+            inlineText = "Vennela 365 Keynote Deck"
+            runCatching { writeSamplePptx(targetFile) }
+        }
+        "pdf" -> {
+            inlineText = "Vennela 365 Executive PDF Report"
+            runCatching { writeSamplePdf(targetFile) }
+        }
+        "scan" -> {
+            inlineText = "Oken HD Signed Contract Scan"
+            runCatching { writeSampleScanPng(targetFile) }
+        }
+        "md" -> {
+            inlineText = """
+                # Vennela 365 • Universal Viewing Engine
+                
+                Welcome to the **5-Suite Universal Viewer** with **OnePlus Sans** typography and **WPS Eye-Care Green (`#C7EDCC`)** paper tones.
+                
+                ## Supported Flagship Viewing Suites
+                - **Google Workspace**: Crisp A4 print canvas, ruler bar, and Material 3 action pills.
+                - **Microsoft 365**: Fluent command ribbon, status bar metrics, and immersive reader.
+                - **WPS Office Super**: 1-tap Eye-Care Green (`#C7EDCC`), Warm Parchment, and Night Obsidian paper.
+                - **LibreOffice**: OpenDocument structural margin guides and technical inspector.
+                - **Oken Scanner HD**: Magic Color enhancement, Crisp B&W document contrast, and official stamps.
+                
+                ```kotlin
+                val engine = VennelaSuiteEngine(
+                    suites = ViewerSuiteStyle.entries,
+                    typography = AppFontStyle.ONEPLUS_SANS,
+                    apkBudgetMb = 9.4
+                )
+                ```
+            """.trimIndent()
+            runCatching { targetFile.writeText(inlineText) }
+        }
+        "ipynb" -> {
+            inlineText = """
+                {
+                  "nbformat": 4,
+                  "nbformat_minor": 5,
+                  "metadata": {
+                    "kernelspec": { "display_name": "Python 3 (Vennela AI Kernel)", "language": "python", "name": "python3" },
+                    "language_info": { "name": "python" }
+                  },
+                  "cells": [
+                    {
+                      "cell_type": "markdown",
+                      "metadata": {},
+                      "source": [
+                        "# Vennela 365 Telemetry & Performance Benchmark\n",
+                        "Comparing cold-start frame times and memory efficiency across all 5 viewing suites."
+                      ]
+                    },
+                    {
+                      "cell_type": "code",
+                      "execution_count": 1,
+                      "metadata": {},
+                      "source": [
+                        "suites = ['Google Workspace', 'Microsoft 365', 'WPS Super', 'LibreOffice', 'Oken Scanner HD']\n",
+                        "frame_times_ms = [4.1, 4.3, 3.9, 4.0, 3.8]\n",
+                        "for name, ms in zip(suites, frame_times_ms):\n",
+                        "    print(f'{name:20s} -> {ms:.1f} ms (120Hz locked)')"
+                      ],
+                      "outputs": [
+                        {
+                          "output_type": "stream",
+                          "name": "stdout",
+                          "text": [
+                            "Google Workspace     -> 4.1 ms (120Hz locked)\n",
+                            "Microsoft 365        -> 4.3 ms (120Hz locked)\n",
+                            "WPS Super            -> 3.9 ms (120Hz locked)\n",
+                            "LibreOffice          -> 4.0 ms (120Hz locked)\n",
+                            "Oken Scanner HD      -> 3.8 ms (120Hz locked)\n"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+            """.trimIndent()
+            runCatching { targetFile.writeText(inlineText) }
+        }
+    }
+
+    val uri = Uri.fromFile(targetFile)
+    return FileItem(
+        id = "sample_${spec.id}",
+        name = spec.fileName,
+        path = targetFile.absolutePath,
+        uri = uri,
+        extension = spec.extension,
+        sizeBytes = targetFile.length().coerceAtLeast(inlineText.length.toLong()),
+        lastModified = System.currentTimeMillis(),
+        formatInfo = FormatRegistry.lookup(spec.extension),
+        sampleContent = inlineText
+    )
+}
+
+private fun writeSamplePptx(target: java.io.File) {
+    val slides = listOf(
+        Triple(
+            "Vennela 365 • World's Best File Suite",
+            listOf(
+                "5 Flagship Viewing Engines in One < 20 MB App",
+                "Google Docs/Sheets/Slides • Microsoft 365 • WPS Super • LibreOffice • Oken Scanner",
+                "Crafted with OnePlus Sans Typography & Apple Liquid Glass"
+            ),
+            "Welcome to the executive keynote deck. Tap any suite chip above to transform the stage."
+        ),
+        Triple(
+            "WPS Super & Oken Scanner HD",
+            listOf(
+                "Signature Eye-Care Green (#C7EDCC) & Warm Parchment Paper",
+                "Oken Magic Color, Crisp B&W Contrast & Auto-Edge Handles",
+                "Hands-Free Teleprompter & Laser Pointer Stage Controls"
+            ),
+            "Demonstrates Asian Super-App ergonomics merged with Silicon Valley polish."
+        ),
+        Triple(
+            "100% Offline • Instant 120Hz Performance",
+            listOf(
+                "Zero Cloud Uploads • Complete On-Device Privacy",
+                "Native PdfRenderer, OOXML/ODF Extractors & Media3 ExoPlayer",
+                "Under 20 MB APK Footprint with Full Format Coverage"
+            ),
+            "Engineered for instant cold starts and zero-jank scrolling."
+        )
+    )
+    java.util.zip.ZipOutputStream(java.io.FileOutputStream(target)).use { zos ->
+        slides.forEachIndexed { idx, (title, bullets, notes) ->
+            val slideNum = idx + 1
+            zos.putNextEntry(java.util.zip.ZipEntry("ppt/slides/slide$slideNum.xml"))
+            val bodyXml = buildString {
+                append("""<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree>""")
+                append("""<p:sp><p:txBody><a:p><a:r><a:t>$title</a:t></a:r></a:p></p:txBody></p:sp>""")
+                bullets.forEach { b ->
+                    append("""<p:sp><p:txBody><a:p><a:r><a:t>$b</a:t></a:r></a:p></p:txBody></p:sp>""")
+                }
+                append("""</p:spTree></p:cSld></p:sld>""")
+            }
+            zos.write(bodyXml.toByteArray(Charsets.UTF_8))
+            zos.closeEntry()
+
+            zos.putNextEntry(java.util.zip.ZipEntry("ppt/notesSlides/notesSlide$slideNum.xml"))
+            val notesXml = """<?xml version="1.0" encoding="UTF-8"?><p:notes xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>$notes</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:notes>"""
+            zos.write(notesXml.toByteArray(Charsets.UTF_8))
+            zos.closeEntry()
+        }
+    }
+}
+
+private fun writeSamplePdf(target: java.io.File) {
+    val pdf = android.graphics.pdf.PdfDocument()
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+    val titles = listOf(
+        "Page 1 • Executive Architecture Brief",
+        "Page 2 • Multi-Suite Viewing Benchmark",
+        "Page 3 • Security & Offline Compliance"
+    )
+    titles.forEachIndexed { index, heading ->
+        val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, index + 1).create()
+        val page = pdf.startPage(pageInfo)
+        val canvas = page.canvas
+        canvas.drawColor(android.graphics.Color.WHITE)
+
+        paint.color = android.graphics.Color.rgb(26, 115, 232)
+        canvas.drawRect(40f, 36f, 555f, 42f, paint)
+
+        paint.color = android.graphics.Color.rgb(15, 23, 42)
+        paint.textSize = 20f
+        paint.isFakeBoldText = true
+        canvas.drawText("VENNELA 365 • UNIVERSAL PRO PDF STUDIO", 40f, 80f, paint)
+
+        paint.color = android.graphics.Color.rgb(26, 115, 232)
+        paint.textSize = 15f
+        canvas.drawText(heading, 40f, 114f, paint)
+
+        paint.color = android.graphics.Color.rgb(51, 65, 85)
+        paint.isFakeBoldText = false
+        paint.textSize = 12f
+        val lines = listOf(
+            "• Switch seamlessly between Google Drive PDF, Microsoft Edge PDF, WPS Eye-Care,",
+            "  LibreOffice Draw, and Oken Scanner HD modes using the top suite bar.",
+            "• Test WPS Eye-Care Green (#C7EDCC) and Oken Magic Color / Crisp B&W filters.",
+            "• Toggle the Confidential Watermark and APPROVED Stamp in 1 tap.",
+            "• Pinch to zoom up to 5x or jump across page thumbnails at the bottom."
+        )
+        var y = 156f
+        lines.forEach { line ->
+            canvas.drawText(line, 40f, y, paint)
+            y += 24f
+        }
+
+        paint.color = android.graphics.Color.rgb(226, 232, 240)
+        canvas.drawRect(40f, 310f, 555f, 470f, paint)
+        paint.color = android.graphics.Color.rgb(15, 23, 42)
+        paint.isFakeBoldText = true
+        canvas.drawText("LIVE METRICS • APK < 20 MB • 120HZ LIQUID GLASS", 60f, 350f, paint)
+        paint.isFakeBoldText = false
+        canvas.drawText("Suite Engine: Google | Microsoft 365 | WPS | LibreOffice | Oken HD", 60f, 385f, paint)
+        canvas.drawText("Typography: OnePlus Sans (Outfit + Inter) | Editorial Serif | Mono", 60f, 415f, paint)
+        canvas.drawText("Verified Page ${index + 1} of ${titles.size}", 60f, 445f, paint)
+
+        pdf.finishPage(page)
+    }
+    java.io.FileOutputStream(target).use { out -> pdf.writeTo(out) }
+    pdf.close()
+}
+
+private fun writeSampleScanPng(target: java.io.File) {
+    val bmp = android.graphics.Bitmap.createBitmap(900, 1200, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bmp)
+    canvas.drawColor(android.graphics.Color.rgb(250, 248, 242))
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+
+    paint.color = android.graphics.Color.rgb(0, 150, 120)
+    paint.strokeWidth = 6f
+    paint.style = android.graphics.Paint.Style.STROKE
+    canvas.drawRect(48f, 48f, 852f, 1152f, paint)
+
+    paint.style = android.graphics.Paint.Style.FILL
+    paint.color = android.graphics.Color.rgb(18, 26, 38)
+    paint.textSize = 34f
+    paint.isFakeBoldText = true
+    canvas.drawText("OKEN HD DOCUMENT SCAN • CONTRACT", 90f, 130f, paint)
+
+    paint.textSize = 22f
+    paint.isFakeBoldText = false
+    paint.color = android.graphics.Color.rgb(55, 65, 81)
+    val paragraphs = listOf(
+        "Document ID: VNL-365-OKEN-2026",
+        "Status: Verified High-Definition Smart Scan",
+        "",
+        "1. Try Oken Scanner HD filters in the bottom bar:",
+        "   • Magic Color (vivid contrast enhancement)",
+        "   • Crisp B&W (pure ink threshold)",
+        "   • Lighten (shadow removal)",
+        "   • Corner Crop Handles & Official Red Stamp",
+        "",
+        "Signed & Authenticated Offline by Vennela 365 Engine."
+    )
+    var y = 200f
+    paragraphs.forEach { line ->
+        canvas.drawText(line, 90f, y, paint)
+        y += 44f
+    }
+
+    java.io.FileOutputStream(target).use { out ->
+        bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 90, out)
+    }
+}
+
