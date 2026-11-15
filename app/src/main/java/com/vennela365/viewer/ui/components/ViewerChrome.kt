@@ -66,14 +66,13 @@ import com.vennela365.viewer.theme.liquidGlass
 import com.vennela365.viewer.theme.liquidGlassSpec
 
 /**
- * Apple iOS 26 / visionOS Liquid Glass Top Menubar.
+ * Google Android 16 Material 3 Expressive Glassmorphic Top App Bar.
  *
- * Floating refractive glass capsule (`52.dp` height) with:
- * - Translucent frosted circular Back button (`36.dp`) with crisp specular rim,
- * - Optional leading glass squircle badge,
- * - Cleanly proportioned title (`15.sp` SemiBold) and subtitle (`11.sp` Medium)
- *   that never cramp or clip vertically,
- * - Optional hairline progress bar along the bottom edge,
+ * Floating frosted M3 surface container (`52.dp` height) with:
+ * - Tonal M3 circular Back button (`36.dp`) with reactive ripple + spring scale,
+ * - Optional leading Material 3 squircle container badge,
+ * - Cleanly proportioned OnePlus Display title (`15.sp` Bold) and subtitle (`11.sp` Medium),
+ * - Optional Material 3 linear progress indicator along the bottom edge,
  * - Precision-spaced trailing action icons (`ReaderIconButton` / `ViewerIconAction`).
  */
 @Composable
@@ -246,10 +245,10 @@ fun ViewerTopBar(
                     Text(
                         text = title,
                         color = palette.textPrimary,
-                        fontFamily = VennelaFonts.Sans,
+                        fontFamily = VennelaFonts.OnePlusDisplay,
                         fontSize = 15.sp,
                         lineHeight = 18.sp,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Bold,
                         letterSpacing = (-0.15).sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -324,10 +323,10 @@ fun ViewerIconAction(
 }
 
 /**
- * Apple iOS 26 Liquid Glass Floating Viewer Control Dock.
+ * Google Android 16 Material 3 Expressive Glassmorphic Floating Toolbar Dock.
  *
  * Houses primary viewer tools (search, zoom, TOC, theme, share, info) inside
- * a refractive bottom glass capsule (`54.dp` height).
+ * a frosted M3 `surfaceContainerHigh` capsule (`54.dp` height).
  */
 @Composable
 fun ViewerDock(

@@ -1,12 +1,16 @@
 package com.vennela365.viewer.theme
 
 import android.app.Activity
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -18,30 +22,44 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 
 // ---------------------------------------------------------------------------
-// Nebula Flux Material 3 color schemes
+// Google Android 16 Material 3 Expressive + Glassmorphic Shape Scale
+// ---------------------------------------------------------------------------
+
+val VennelaExpressiveShapes = Shapes(
+    extraSmall = RoundedCornerShape(10.dp),
+    small = RoundedCornerShape(14.dp),
+    medium = RoundedCornerShape(20.dp),
+    large = RoundedCornerShape(26.dp),
+    extraLarge = RoundedCornerShape(32.dp)
+)
+
+// ---------------------------------------------------------------------------
+// Google Android 16 Material 3 Expressive Base Color Schemes
 // ---------------------------------------------------------------------------
 
 private val DarkColorScheme = darkColorScheme(
-    primary = MoonBlue,                          // Electric Cyan
-    secondary = NeonViolet,                      // Aurora Violet
+    primary = MoonBlue,
+    secondary = NeonViolet,
     tertiary = CatViolet,
-    background = MoonDeepDark,                   // deep graphite #0C0F14
-    surface = MoonSurfaceDark,                   // #141820
-    surfaceVariant = elevatedNavySurface,         // #1A1F2A
+    background = MoonDeepDark,
+    surface = MoonSurfaceDark,
+    surfaceVariant = elevatedNavySurface,
     onPrimary = Color(0xFF001F2A),
     onSecondary = Color(0xFF1A0040),
     onTertiary = Color.White,
-    onBackground = TextPrimary,                  // #F0F2F5
+    onBackground = TextPrimary,
     onSurface = TextPrimary,
-    onSurfaceVariant = TextSecondary,            // #8B95A5
-    outline = MoonGlassBorder,                   // cyan rim 30% alpha
-    outlineVariant = Color(0x1E00D4FF),          // subtle cyan veil
+    onSurfaceVariant = TextSecondary,
+    outline = MoonGlassBorder,
+    outlineVariant = Color(0x2800D4FF),
     error = errorCoral,
     onError = Color.White,
     errorContainer = errorContainer,
@@ -49,9 +67,9 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFF0091C7),
-    secondary = Color(0xFF7C3AED),
-    tertiary = Color(0xFF8B5CF6),
+    primary = Color(0xFF006782),
+    secondary = Color(0xFF5B43D6),
+    tertiary = Color(0xFF7C3AED),
     background = LightBackground,
     surface = LightSurface,
     surfaceVariant = LightSurfaceVariant,
@@ -70,7 +88,7 @@ private val LightColorScheme = lightColorScheme(
 )
 
 // ---------------------------------------------------------------------------
-// VennelaTheme — signature preserved exactly
+// VennelaTheme — Android 16 Material 3 Expressive + Frosted Glassmorphism
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -81,6 +99,7 @@ fun VennelaTheme(
     fontStyle: AppFontStyle = AppFontStyle.ONEPLUS_SANS,
     content: @Composable () -> Unit
 ) {
+    val context = LocalContext.current
     val isDark = when (themeMode) {
         ThemeMode.DARK -> true
         ThemeMode.LIGHT -> false
@@ -90,11 +109,48 @@ fun VennelaTheme(
     val palette = (if (isDark) DarkVennelaPalette else LightVennelaPalette)
         .tinted(resolvedAccent)
 
-    val colorScheme = (if (isDark) DarkColorScheme else LightColorScheme).copy(
+    // Harmonize Android 12+ Dynamic Color Scheme with our Material 3 Expressive Tonal Palette
+    val dynamicBase = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        runCatching {
+            if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        }.getOrNull()
+    } else null
+
+    val baseScheme = dynamicBase ?: if (isDark) DarkColorScheme else LightColorScheme
+    val primaryContainer = if (isDark) {
+        lerp(palette.cardSurfaceStrong, resolvedAccent.primary, 0.32f)
+    } else {
+        lerp(Color.White, resolvedAccent.primary, 0.16f)
+    }
+    val secondaryContainer = if (isDark) {
+        lerp(palette.cardSurfaceStrong, resolvedAccent.secondary, 0.28f)
+    } else {
+        lerp(Color.White, resolvedAccent.secondary, 0.14f)
+    }
+
+    val colorScheme = baseScheme.copy(
         primary = resolvedAccent.primary,
+        onPrimary = if (isDark) Color(0xFF04131D) else Color.White,
+        primaryContainer = primaryContainer,
+        onPrimaryContainer = if (isDark) Color.White else palette.textPrimary,
         secondary = resolvedAccent.secondary,
+        onSecondary = Color.White,
+        secondaryContainer = secondaryContainer,
+        onSecondaryContainer = if (isDark) Color.White else palette.textPrimary,
+        tertiary = lerp(resolvedAccent.primary, resolvedAccent.secondary, 0.5f),
         background = palette.backgroundTop,
-        surface = palette.backgroundMid
+        onBackground = palette.textPrimary,
+        surface = palette.backgroundMid,
+        onSurface = palette.textPrimary,
+        surfaceVariant = palette.cardSurfaceStrong,
+        onSurfaceVariant = palette.textSecondary,
+        surfaceContainerLowest = palette.backgroundBottom,
+        surfaceContainerLow = palette.backgroundMid,
+        surfaceContainer = palette.cardSurface,
+        surfaceContainerHigh = palette.cardSurfaceStrong,
+        surfaceContainerHighest = lerp(palette.cardSurfaceStrong, resolvedAccent.primary, 0.14f),
+        outline = palette.cardBorder,
+        outlineVariant = palette.cardBorder.copy(alpha = 0.45f)
     )
 
     val view = LocalView.current
@@ -115,6 +171,7 @@ fun VennelaTheme(
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
+            shapes = VennelaExpressiveShapes,
             typography = vennelaTypographyFor(fontStyle),
             content = content
         )
@@ -122,14 +179,13 @@ fun VennelaTheme(
 }
 
 // ---------------------------------------------------------------------------
-// glassCard — Nebula Flux: liquid borders (bright→transparent diagonal),
-// chromatic depth gradient body, and cyan/violet glow shadow.
+// glassCard — Android 16 Material 3 Expressive Frosted Glass Card
 // ---------------------------------------------------------------------------
 
 fun Modifier.glassCard(
     cornerRadius: Dp,
-    backgroundColor: Color = Color(0x2E1A2030),  // 18% graphite glass
-    borderColor: Color = Color(0x4D00D4FF),       // cyan rim
+    backgroundColor: Color = Color(0x2E1A2030),
+    borderColor: Color = Color(0x4D00D4FF),
     borderWidth: Dp = 1.dp,
     elevation: Dp = 8.dp
 ): Modifier = glassCard(
@@ -152,28 +208,25 @@ fun Modifier.glassCard(
             elevation = elevation,
             shape = shape,
             clip = false,
-            ambientColor = Color(0x4000D4FF),     // cyan ambient glow
-            spotColor = Color(0x308B5CF6)          // violet spot glow
+            ambientColor = Color(0x4000D4FF),
+            spotColor = Color(0x308B5CF6)
         )
         .clip(shape)
         .background(
-            // Chromatic depth: top surface is lighter/transparent, deeper is
-            // more saturated — the hallmark Nebula Flux layering.
             Brush.verticalGradient(
                 colors = listOf(
-                    backgroundColor.copy(alpha = 0.30f),
-                    backgroundColor.copy(alpha = 0.18f),
-                    backgroundColor.copy(alpha = 0.10f)
+                    backgroundColor.copy(alpha = 0.34f),
+                    backgroundColor.copy(alpha = 0.22f),
+                    backgroundColor.copy(alpha = 0.14f)
                 )
             )
         )
         .border(
             borderWidth,
-            // Liquid border: bright top-left flowing to transparent bottom-right
             Brush.linearGradient(
                 colors = listOf(
                     borderColor.copy(alpha = VennelaTokens.liquidBorderAlphaBright),
-                    borderColor.copy(alpha = 0.30f),
+                    borderColor.copy(alpha = 0.32f),
                     borderColor.copy(alpha = VennelaTokens.liquidBorderAlphaFade)
                 )
             ),
@@ -181,22 +234,18 @@ fun Modifier.glassCard(
         )
 }
 
-// ---------------------------------------------------------------------------
-// glassPill — Nebula Flux: more translucent, liquid gradient border
-// ---------------------------------------------------------------------------
-
 fun Modifier.glassPill(
     shape: Shape = RoundedCornerShape(50),
-    backgroundColor: Color = Color(0x301A2030),   // 19% graphite glass
-    borderColor: Color = Color(0x4D00D4FF)        // cyan rim
+    backgroundColor: Color = Color(0x301A2030),
+    borderColor: Color = Color(0x4D00D4FF)
 ): Modifier = composed {
     this
         .clip(shape)
         .background(
             Brush.horizontalGradient(
                 colors = listOf(
-                    backgroundColor.copy(alpha = 0.28f),
-                    backgroundColor.copy(alpha = 0.16f)
+                    backgroundColor.copy(alpha = 0.32f),
+                    backgroundColor.copy(alpha = 0.18f)
                 )
             )
         )

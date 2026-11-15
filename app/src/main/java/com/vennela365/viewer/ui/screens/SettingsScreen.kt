@@ -111,7 +111,7 @@ import java.io.File
 import java.util.Locale
 
 /**
- * Apple iOS 26 Liquid Glass Settings & Appearance Studio.
+ * Google Android 16 Material 3 Expressive + Frosted Glassmorphism Settings & Appearance Studio.
  *
  * Every surface responds instantaneously on the same frame when switching
  * between Dark, Light, and System modes or selecting any theme/accent.
@@ -183,7 +183,7 @@ fun SettingsScreen(
             ) {
                 item(key = "appearance-header") {
                     SectionHeader(
-                        title = "Appearance & Liquid Glass",
+                        title = "Appearance & M3 Expressive Glass",
                         actionLabel = "All 10 Themes",
                         onAction = { viewModel.navigateTo(Screen.ThemeSelection) }
                     )
@@ -542,7 +542,7 @@ private fun AppearanceSection(
 
         GlassDivider()
 
-        // 2. Apple iOS 26 Segmented Appearance Mode Control (Dark / Light / System)
+        // 2. Google Android 16 Material 3 Expressive Segmented Appearance Mode Control (Dark / Light / System)
         Column(
             modifier = Modifier.padding(
                 horizontal = VennelaTokens.spaceLg,
@@ -553,8 +553,8 @@ private fun AppearanceSection(
                 icon = themeModeIcon(themeMode),
                 title = "Appearance mode",
                 value = when (themeMode) {
-                    ThemeMode.DARK -> "Dark • Obsidian Lunar Glass"
-                    ThemeMode.LIGHT -> "Light • Daylight Pearl Glass"
+                    ThemeMode.DARK -> "Dark • Android 16 M3 Obsidian Glass"
+                    ThemeMode.LIGHT -> "Light • Android 16 M3 Daylight Glass"
                     ThemeMode.SYSTEM -> "System • Follows Android Display"
                 }
             )
@@ -666,7 +666,7 @@ private fun AppearanceSection(
         ) {
             SettingsBlockLabel(
                 icon = Icons.Default.Speed,
-                title = "Liquid Glass optical fidelity (Φ)",
+                title = "M3 Expressive Glass optical fidelity (Φ)",
                 value = "${fidelityPref.label} • ${fidelityTier.maxFps} fps target"
             )
             Spacer(modifier = Modifier.height(VennelaTokens.spaceSm))

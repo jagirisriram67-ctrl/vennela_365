@@ -240,7 +240,7 @@ object PdfBookmarkMemory {
 }
 
 /**
- * Curated iOS Markup ink palette.
+ * Curated Material 3 Expressive Pro Markup ink palette.
  */
 val PdfMarkupColors: List<Color> = listOf(
     Color(0xFFFFD60A), // Solar Gold
@@ -1341,14 +1341,14 @@ fun generateShowcasePdf(context: Context): File {
             )
         ),
         Triple(
-            "Apple iOS 26 Liquid Glass Optical Pipeline",
-            "PAGE 03 • CAUSTIC REFRACTION & SPECULAR SURFACE TOKENS",
+            "Android 16 Material 3 Expressive Glass Pipeline",
+            "PAGE 03 • TONAL SURFACE CONTAINERS & FROSTED GLASS TOKENS",
             listOf(
-                "Vennela 365 synthesizes multi-stop optical glass surfaces in real time:",
-                "1. Top Specular Caustic Highlight: Simulates curved lens light concentration.",
-                "2. Diagonal Refractive Rim: Dual-stop border gradient responding to theme accents.",
-                "3. Bottom Bounce Illumination: Subtle ambient reflection along floating docks.",
-                "4. Spring-Physics Press Scale: Responsive tactile feedback on every interactive control."
+                "Vennela 365 synthesizes Material 3 Expressive frosted glass surfaces in real time:",
+                "1. Top Specular Illumination: Simulates frosted glass light dispersion.",
+                "2. Diagonal Refractive Rim: Dual-stop border gradient harmonized with M3 accents.",
+                "3. Tonal Surface Containers: M3 surfaceContainerLowest..Highest depth hierarchy.",
+                "4. M3 Ripple + Spring Physics: Hyper-reactive tactile feedback on every control."
             )
         ),
         Triple(
@@ -1356,7 +1356,7 @@ fun generateShowcasePdf(context: Context): File {
             "PAGE 04 • VECTOR INK, HIGHLIGHTER & FLATTENED PDF EXPORT",
             listOf(
                 "Try annotating this page right now using the Markup Studio button in the dock:",
-                "• Tap the Pen/Markup icon in the bottom toolbar to open the iOS Markup Studio.",
+                "• Tap the Pen/Markup icon in the bottom toolbar to open the Pro PDF Markup Studio.",
                 "• Switch between fine/medium/bold Pen strokes and translucent neon Highlighters.",
                 "• Add per-page sticky notes or bookmark key pages using the top-bar Bookmark icon.",
                 "• Tap 'Save PDF' in the Markup bar to burn your annotations into a shareable PDF file."
@@ -1446,9 +1446,9 @@ fun generateShowcasePdf(context: Context): File {
 val ShowcasePdfPageTexts: List<String> = listOf(
     """
     Vennela 365 Pro PDF & Universal Studio
-    Executive Architecture & Liquid Glass Design
+    Executive Architecture & M3 Expressive Glass Design
     
-    Welcome to Vennela 365 — the native universal file viewer and Pro PDF Studio crafted with Apple iOS 26 Liquid Glass optical surfaces.
+    Welcome to Vennela 365 — the native universal file viewer and Pro PDF Studio crafted with Google Android 16 Material 3 Expressive Frosted Glassmorphism.
     Every format is decoded locally on-device with zero cloud uploads or telemetry.
     • 4 PDF Viewing Modes: Single Page Swipe, Continuous Scroll, 2-Page Spread, and Reflow Reader.
     • Live Vector Ink & Highlighter Studio: Draw, highlight, undo/redo, and export flattened PDFs.
@@ -1466,21 +1466,21 @@ val ShowcasePdfPageTexts: List<String> = listOf(
     • 3D CAD Wireframe Projection: 8.4 ms cold open, 99.9% 60fps scroll stability, 9.6 MB footprint.
     """.trimIndent(),
     """
-    Apple iOS 26 Liquid Glass Optical Pipeline
-    Caustic Refraction & Specular Surface Tokens
+    Android 16 Material 3 Expressive Glass Pipeline
+    Tonal Surface Containers & Frosted Glass Tokens
     
-    Vennela 365 synthesizes multi-stop optical glass surfaces in real time:
-    1. Top Specular Caustic Highlight: Simulates curved lens light concentration.
-    2. Diagonal Refractive Rim: Dual-stop border gradient responding to theme accents.
-    3. Bottom Bounce Illumination: Subtle ambient reflection along floating docks.
-    4. Spring-Physics Press Scale: Responsive tactile feedback on every interactive control.
+    Vennela 365 synthesizes Material 3 Expressive frosted glass surfaces in real time:
+    1. Top Specular Illumination: Simulates frosted glass light dispersion.
+    2. Diagonal Refractive Rim: Dual-stop border gradient harmonized with M3 accents.
+    3. Tonal Surface Containers: M3 surfaceContainerLowest..Highest depth hierarchy.
+    4. M3 Ripple + Spring Physics: Hyper-reactive tactile feedback on every control.
     """.trimIndent(),
     """
     Interactive Markup & Annotation Workflow
     Vector Ink, Highlighter & Flattened PDF Export
     
     Try annotating this page right now using the Markup Studio button in the dock:
-    • Tap the Pen/Markup icon in the bottom toolbar to open the iOS Markup Studio.
+    • Tap the Pen/Markup icon in the bottom toolbar to open the Pro PDF Markup Studio.
     • Switch between fine, medium, and bold Pen strokes and translucent neon Highlighters.
     • Add per-page sticky notes or bookmark key pages using the top-bar Bookmark icon.
     • Tap Save PDF in the Markup bar to burn your annotations into a shareable PDF file.

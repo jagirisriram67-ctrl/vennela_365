@@ -1,8 +1,11 @@
 package com.vennela365.viewer.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,7 +13,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,12 +20,12 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
@@ -38,19 +40,17 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -85,15 +85,14 @@ private val dockEntries = listOf(
 )
 
 /**
- * Apple iOS 26 Liquid Glass Floating Tab Bar (Menubar).
+ * Google Android 16 Material 3 Expressive + Glassmorphic Navigation Bar.
  *
  * Features:
- * - Translucent multi-stop refractive glass bar (`62.dp` height, `31.dp` pill radius)
- *   with top-edge optical specular rim and soft elevation shadow.
- * - Spring-physics sliding **Liquid Glass Lens** indicator that refracts the active
- *   accent with a luminous glass top sheen rather than a heavy opaque block.
- * - Distinct Filled vs Outlined SF-inspired iconography and balanced `10.5.sp`
- *   labels that never clip or crowd.
+ * - Authentic Material 3 Expressive `64.dp x 32.dp` **Stadium Active Pill Indicator**
+ *   that spring-expands horizontally around the active icon (`primaryContainer` + frosted
+ *   glass rim), paired with a crisp M3 label underneath — just like Google Files & Pixel UI.
+ * - Full Material 3 Ripple feedback + hyper-reactive spring bounce on press and selection.
+ * - Frosted glassmorphic M3 `surfaceContainerHigh` bar (`68.dp` height, `28.dp` M3 Extra-Large corner radius).
  */
 @Composable
 fun FloatingDockNav(
@@ -102,38 +101,42 @@ fun FloatingDockNav(
 ) {
     val palette = LocalVennelaPalette.current
     val accent = LocalVennelaAccent.current
-    val shape = RoundedCornerShape(VennelaTokens.radiusDock)
+    val shape = RoundedCornerShape(28.dp)
+
+    val tonalTint = lerp(
+        palette.cardSurfaceStrong,
+        accent.primary,
+        if (palette.isDark) 0.12f else 0.06f
+    )
 
     val spec = LiquidGlassSpec(
         tint = if (palette.isDark) {
-            Color(0xFF161D31).copy(alpha = 0.80f)
+            tonalTint.copy(alpha = 0.88f)
         } else {
-            Color.White.copy(alpha = 0.86f)
+            Color.White.copy(alpha = 0.92f)
         },
         tintEnd = if (palette.isDark) {
-            Color(0xFF0D1222).copy(alpha = 0.74f)
+            palette.cardSurface.copy(alpha = 0.84f)
         } else {
-            palette.cardSurface.copy(alpha = 0.80f)
+            tonalTint.copy(alpha = 0.88f)
         },
         frost = VennelaTokens.frostHeavy,
-        backdropAlpha = 0.82f,
+        backdropAlpha = 0.88f,
         rim = if (palette.isDark) {
-            Color.White.copy(alpha = 0.24f)
+            accent.primary.copy(alpha = 0.34f)
         } else {
-            Color.White.copy(alpha = 0.90f)
+            accent.primary.copy(alpha = 0.24f)
         },
         rimWidth = 1.dp,
-        sheen = 0.26f,
+        sheen = 0.22f,
         elevation = VennelaTokens.elevationDock,
         shadowColor = if (palette.isDark) {
             Color.Black.copy(alpha = 0.56f)
         } else {
-            palette.backgroundBottom.copy(alpha = 0.16f)
+            accent.primary.copy(alpha = 0.16f)
         },
-        highlight = 0.22f
+        highlight = 0.18f
     )
-
-    val activeIndex = dockEntries.indexOfFirst { it.id == activeTab }.coerceAtLeast(0)
 
     Box(
         modifier = Modifier
@@ -147,108 +150,32 @@ fun FloatingDockNav(
             ),
         contentAlignment = Alignment.Center
     ) {
-        BoxWithConstraints(
+        Row(
             modifier = Modifier
-                .widthIn(max = 460.dp)
+                .widthIn(max = 500.dp)
                 .fillMaxWidth()
-                .height(62.dp)
+                .height(68.dp)
                 .liquidGlass(spec, shape)
-                .padding(horizontal = 6.dp, vertical = 5.dp)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            val slotWidth = maxWidth / dockEntries.size
-            val indicatorOffset by animateDpAsState(
-                targetValue = slotWidth * activeIndex,
-                animationSpec = LiquidMotion.liquid(),
-                label = "dockIndicatorOffset"
-            )
-
-            // Refractive iOS 26 Liquid Glass Lens pill for the active tab
-            val lensShape = RoundedCornerShape(26.dp)
-            val lensFillBrush = if (palette.isDark) {
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.20f),
-                        accent.primary.copy(alpha = 0.34f),
-                        accent.secondary.copy(alpha = 0.22f)
-                    )
+            dockEntries.forEach { entry ->
+                M3ExpressiveNavBarItem(
+                    entry = entry,
+                    isActive = activeTab == entry.id,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("dock_tab_${entry.id}"),
+                    onClick = { onTabSelected(entry.id) }
                 )
-            } else {
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.95f),
-                        accent.primary.copy(alpha = 0.20f),
-                        accent.secondary.copy(alpha = 0.14f)
-                    )
-                )
-            }
-            val lensRimBrush = Brush.verticalGradient(
-                colors = listOf(
-                    Color.White.copy(alpha = if (palette.isDark) 0.58f else 0.95f),
-                    accent.secondary.copy(alpha = if (palette.isDark) 0.42f else 0.35f),
-                    Color.White.copy(alpha = 0.14f)
-                )
-            )
-
-            Box(
-                modifier = Modifier
-                    .offset(x = indicatorOffset)
-                    .width(slotWidth)
-                    .height(52.dp)
-                    .padding(horizontal = 2.dp)
-                    .shadow(
-                        elevation = 8.dp,
-                        shape = lensShape,
-                        clip = false,
-                        ambientColor = accent.primary.copy(alpha = 0.36f),
-                        spotColor = accent.secondary.copy(alpha = 0.36f)
-                    )
-                    .clip(lensShape)
-                    .background(lensFillBrush)
-                    .drawWithContent {
-                        drawContent()
-                        val sheenH = size.height * 0.45f
-                        drawRect(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.White.copy(alpha = if (palette.isDark) 0.22f else 0.45f),
-                                    Color.Transparent
-                                ),
-                                startY = 0f,
-                                endY = sheenH
-                            ),
-                            topLeft = Offset.Zero,
-                            size = Size(size.width, sheenH)
-                        )
-                    }
-                    .border(
-                        width = 1.dp,
-                        brush = lensRimBrush,
-                        shape = lensShape
-                    )
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                dockEntries.forEach { entry ->
-                    DockItem(
-                        entry = entry,
-                        isActive = activeTab == entry.id,
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("dock_tab_${entry.id}"),
-                        onClick = { onTabSelected(entry.id) }
-                    )
-                }
             }
         }
     }
 }
 
 @Composable
-private fun DockItem(
+private fun M3ExpressiveNavBarItem(
     entry: DockEntry,
     isActive: Boolean,
     modifier: Modifier = Modifier,
@@ -259,78 +186,143 @@ private fun DockItem(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
-    val scale by animateFloatAsState(
+    val itemScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.90f else 1.0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "m3NavItemScale"
+    )
+
+    // Material 3 Expressive Stadium Pill width expansion (32.dp -> 58.dp)
+    val pillWidth by animateDpAsState(
+        targetValue = if (isActive) 56.dp else 32.dp,
+        animationSpec = spring(
+            dampingRatio = 0.62f,
+            stiffness = 460f
+        ),
+        label = "m3NavPillWidth"
+    )
+
+    val pillAlpha by animateFloatAsState(
+        targetValue = if (isActive) 1f else 0f,
+        animationSpec = tween(durationMillis = 180),
+        label = "m3NavPillAlpha"
+    )
+
+    val iconScale by animateFloatAsState(
         targetValue = when {
-            isPressed -> 0.91f
-            isActive -> 1.0f
+            isPressed -> 0.88f
+            isActive -> 1.10f
             else -> 1.0f
         },
-        animationSpec = LiquidMotion.press(),
-        label = "dockItemScale"
-    )
-    val iconScale by animateFloatAsState(
-        targetValue = if (isActive) 1.06f else 1.0f,
-        animationSpec = LiquidMotion.liquid(),
-        label = "dockIconScale"
+        animationSpec = spring(
+            dampingRatio = 0.54f,
+            stiffness = 500f
+        ),
+        label = "m3NavIconScale"
     )
 
     val activeIconTint = if (palette.isDark) Color.White else accent.primary
-    val activeLabelTint = if (palette.isDark) Color.White else palette.textPrimary
-    val inactiveTint = palette.textSecondary.copy(alpha = if (palette.isDark) 0.78f else 0.72f)
+    val activeLabelTint = if (palette.isDark) accent.secondary else accent.primary
+    val inactiveTint = palette.textSecondary.copy(alpha = if (palette.isDark) 0.82f else 0.76f)
 
     val iconTint by animateColorAsState(
         targetValue = if (isActive) activeIconTint else inactiveTint,
-        animationSpec = androidx.compose.animation.core.tween(LiquidMotion.durationFast),
-        label = "dockIconTint"
+        animationSpec = tween(LiquidMotion.durationFast),
+        label = "m3NavIconTint"
     )
     val labelTint by animateColorAsState(
         targetValue = if (isActive) activeLabelTint else inactiveTint,
-        animationSpec = androidx.compose.animation.core.tween(LiquidMotion.durationFast),
-        label = "dockLabelTint"
+        animationSpec = tween(LiquidMotion.durationFast),
+        label = "m3NavLabelTint"
+    )
+
+    val pillFillBrush = Brush.horizontalGradient(
+        colors = if (palette.isDark) {
+            listOf(
+                accent.primary.copy(alpha = 0.42f * pillAlpha),
+                accent.secondary.copy(alpha = 0.32f * pillAlpha)
+            )
+        } else {
+            listOf(
+                accent.primary.copy(alpha = 0.22f * pillAlpha),
+                accent.secondary.copy(alpha = 0.16f * pillAlpha)
+            )
+        }
     )
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
         modifier = modifier
-            .height(52.dp)
+            .height(56.dp)
             .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
+                scaleX = itemScale
+                scaleY = itemScale
             }
-            .clip(RoundedCornerShape(26.dp))
+            .clip(RoundedCornerShape(18.dp))
             .semantics {
                 selected = isActive
                 contentDescription = entry.label
             }
             .clickable(
                 interactionSource = interactionSource,
-                indication = null,
+                indication = ripple(bounded = true, color = accent.primary),
                 role = Role.Tab,
                 onClick = onClick
             )
-            .padding(horizontal = 4.dp, vertical = 4.dp)
+            .padding(vertical = 2.dp)
     ) {
-        Icon(
-            imageVector = if (isActive) entry.activeIcon else entry.inactiveIcon,
-            contentDescription = entry.label,
-            tint = iconTint,
+        // Material 3 Expressive 30.dp Stadium Indicator Pill around Icon
+        Box(
             modifier = Modifier
-                .size(20.dp)
-                .graphicsLayer {
-                    scaleX = iconScale
-                    scaleY = iconScale
-                }
-        )
-        Spacer(modifier = Modifier.height(2.dp))
+                .width(pillWidth)
+                .height(30.dp)
+                .clip(CircleShape)
+                .background(pillFillBrush, CircleShape)
+                .then(
+                    if (isActive) {
+                        Modifier.border(
+                            width = 1.dp,
+                            brush = Brush.horizontalGradient(
+                                listOf(
+                                    Color.White.copy(alpha = if (palette.isDark) 0.46f else 0.85f),
+                                    accent.secondary.copy(alpha = 0.50f)
+                                )
+                            ),
+                            shape = CircleShape
+                        )
+                    } else {
+                        Modifier
+                    }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = if (isActive) entry.activeIcon else entry.inactiveIcon,
+                contentDescription = entry.label,
+                tint = iconTint,
+                modifier = Modifier
+                    .size(20.dp)
+                    .graphicsLayer {
+                        scaleX = iconScale
+                        scaleY = iconScale
+                    }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(3.dp))
+
         Text(
             text = entry.label,
             color = labelTint,
-            fontFamily = VennelaFonts.Sans,
-            fontSize = 10.5.sp,
-            lineHeight = 12.sp,
+            fontFamily = VennelaFonts.OnePlusDisplay,
+            fontSize = 11.sp,
+            lineHeight = 13.sp,
             fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-            letterSpacing = (-0.1).sp,
+            letterSpacing = 0.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )

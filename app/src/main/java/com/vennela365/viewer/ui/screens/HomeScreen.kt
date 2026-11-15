@@ -356,19 +356,44 @@ private fun HomeHeader(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.Center
         ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = "Vennela 365",
+                    color = palette.textPrimary,
+                    fontFamily = VennelaFonts.OnePlusDisplay,
+                    fontSize = 17.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-0.3).sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(VennelaTokens.radiusPill))
+                        .background(accent.primary.copy(alpha = if (palette.isDark) 0.24f else 0.14f))
+                        .border(
+                            0.75.dp,
+                            accent.secondary.copy(alpha = 0.42f),
+                            RoundedCornerShape(VennelaTokens.radiusPill)
+                        )
+                        .padding(horizontal = 6.dp, vertical = 1.5.dp)
+                ) {
+                    Text(
+                        text = "ANDROID 16 M3",
+                        color = if (palette.isDark) accent.secondary else accent.primary,
+                        fontFamily = VennelaFonts.OnePlusDisplay,
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+            }
             Text(
-                text = "Vennela 365",
-                color = palette.textPrimary,
-                fontFamily = VennelaFonts.Sans,
-                fontSize = 17.sp,
-                lineHeight = 20.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.3).sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = "Universal File Studio",
+                text = "Material 3 Expressive Glass • Universal Studio",
                 color = palette.textSecondary,
                 fontFamily = VennelaFonts.Sans,
                 fontSize = 11.sp,
@@ -1041,7 +1066,7 @@ private fun buildRealSuiteSampleFile(
                 Vennela 365 Universal Multi-Suite Document Engine
                 
                 1. Executive Summary
-                Vennela 365 unifies the world's top five document & file viewing paradigms inside a single < 20 MB native Android engine powered by OnePlus Sans (Outfit + Inter) typography and Apple Liquid Glass surfaces:
+                Vennela 365 unifies the world's top five document & file viewing paradigms inside a single < 20 MB native Android engine powered by OnePlus Sans (Outfit + Inter) typography and Google Android 16 Material 3 Expressive Frosted Glassmorphism:
                 • Google Workspace (Docs A4 Canvas, Sheets Formula Bar, Slides 16:9 Stage, Drive PDF Pill)
                 • Microsoft 365 (Word Fluent Ribbon, Excel Grid & Status Sums, PowerPoint Presenter Notes)
                 • WPS Office Super-App (Eye-Care Green #C7EDCC Paper, Warm Parchment, Night Obsidian, Teleprompter)
@@ -1172,7 +1197,7 @@ private fun writeSamplePptx(target: java.io.File) {
             listOf(
                 "5 Flagship Viewing Engines in One < 20 MB App",
                 "Google Docs/Sheets/Slides • Microsoft 365 • WPS Super • LibreOffice • Oken Scanner",
-                "Crafted with OnePlus Sans Typography & Apple Liquid Glass"
+                "Crafted with OnePlus Sans Typography & Android 16 Material 3 Expressive Glass"
             ),
             "Welcome to the executive keynote deck. Tap any suite chip above to transform the stage."
         ),
@@ -1264,7 +1289,7 @@ private fun writeSamplePdf(target: java.io.File) {
         canvas.drawRect(40f, 310f, 555f, 470f, paint)
         paint.color = android.graphics.Color.rgb(15, 23, 42)
         paint.isFakeBoldText = true
-        canvas.drawText("LIVE METRICS • APK < 20 MB • 120HZ LIQUID GLASS", 60f, 350f, paint)
+        canvas.drawText("LIVE METRICS • APK < 20 MB • 120HZ ANDROID 16 M3 GLASS", 60f, 350f, paint)
         paint.isFakeBoldText = false
         canvas.drawText("Suite Engine: Google | Microsoft 365 | WPS | LibreOffice | Oken HD", 60f, 385f, paint)
         canvas.drawText("Typography: OnePlus Sans (Outfit + Inter) | Editorial Serif | Mono", 60f, 415f, paint)

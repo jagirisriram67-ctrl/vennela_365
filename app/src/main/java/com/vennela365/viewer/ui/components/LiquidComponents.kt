@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -45,6 +46,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -328,7 +330,7 @@ fun SectionHeader(
         Text(
             text = title,
             color = palette.textPrimary,
-            fontFamily = VennelaFonts.Sans,
+            fontFamily = VennelaFonts.OnePlusDisplay,
             fontSize = 18.sp,
             lineHeight = 22.sp,
             fontWeight = FontWeight.Bold,
@@ -377,7 +379,7 @@ fun SectionHeader(
 /* ------------------------------------------------------------------------- */
 
 /**
- * Apple iOS squircle icon badge with top-left specular sheen and crisp glyph.
+ * Google Android 16 Material 3 Expressive squircle icon badge with frosted glass rim.
  */
 @Composable
 fun IconBadge(
@@ -450,19 +452,20 @@ fun IconBadge(
 /* ------------------------------------------------------------------------- */
 
 /**
- * Liquid press feedback: a spring-damped scale plus a brightness lift, which
- * reads as the surface physically yielding to the finger.
+ * Google Android 16 Material 3 Expressive reactive press feedback:
+ * Combines native Material 3 bounded ripple illumination with a spring-damped
+ * physical scale response (`dampingRatio = 0.56f, stiffness = 480f`).
  */
 fun Modifier.pressScale(
-    pressedScale: Float = 0.965f,
+    pressedScale: Float = 0.96f,
     onClick: (() -> Unit)? = null
 ): Modifier = composed {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
         targetValue = if (pressed) pressedScale else 1f,
-        animationSpec = LiquidMotion.press(),
-        label = "pressScale"
+        animationSpec = spring(dampingRatio = 0.56f, stiffness = 480f),
+        label = "m3ExpressivePressScale"
     )
     this
         .graphicsLayer {
@@ -471,7 +474,7 @@ fun Modifier.pressScale(
         }
         .clickable(
             interactionSource = interactionSource,
-            indication = null,
+            indication = ripple(bounded = true),
             enabled = onClick != null,
             onClick = { onClick?.invoke() }
         )
@@ -584,7 +587,7 @@ fun LiquidChip(
 /* ------------------------------------------------------------------------- */
 
 /**
- * Apple iOS inset-grouped list row on the Liquid Glass system.
+ * Google Android 16 Material 3 Expressive glassmorphic list row.
  */
 @Composable
 fun GlassListRow(
